@@ -53,6 +53,7 @@ git clone https://github.com/Zhalslar/astrbot_plugin_gallery
 - [ ] 支持按日期排序图片
 - [ ] 支持热重载
 - [ ] 权限控制
+- [ ] 支持图片拖入文件夹后，自动初始化加载
 
 ## 👥 贡献指南
 
