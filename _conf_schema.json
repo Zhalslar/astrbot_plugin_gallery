@@ -37,13 +37,13 @@
     },
     "exact_match_prob": {
         "description": "# 精准匹配时发图概率",
-        "type": "int",
+        "type": "float",
         "hint": "",
         "default": 0.9
     },
     "fuzzy_match_prob": {
         "description": "# 模糊匹配时发图概率",
-        "type": "int",
+        "type": "float",
         "hint": "",
         "default": 0.9
     },
