@@ -27,8 +27,8 @@ GALLERIES_INFO_FILE = Path("data/plugins_data") / "astrbot_plugin_gallery_info.j
 @register(
     "astrbot_plugin_gallery",
     "Zhalslar",
-    "复读插件",
-    "1.0.0",
+    "本地图库管理器",
+    "1.0.2",
     "https://github.com/Zhalslar/astrbot_plugin_gallery",
 )
 class GalleryPlugin(Star):
