@@ -339,29 +339,9 @@ class GalleryManager:
         self.json_file_path: Path = json_file_path
         self.galleries_dir: Path = galleries_dir
         self.galleries: Dict[str, Gallery] = {}  # 使用字典存储图库实例，键为gallery.name
-        self._init_galleries()  # 初始化图库文件夹
         self._init_json_file()  # 初始化JSON文件
-        self._load_galleries()
-
-
-    def _init_galleries(self):
-        """
-        初始化图库文件夹，
-        确保“总目录->子目录->图片”结构，
-        同时删除非图片文件和空子目录
-        """
-        self.galleries_dir.mkdir(parents=True, exist_ok=True)
-        for item in self.galleries_dir.iterdir():
-            if item.is_dir():
-                for file in item.iterdir():
-                    if file.is_file():
-                        if not self.is_image_file(file):
-                            file.unlink()
-                if not any(f.is_file() for f in item.iterdir()):
-                    item.rmdir()
-            else:
-                if not self.is_image_file(item):
-                    item.unlink()
+        self._init_galleries()  # 初始化图库文件夹
+        self._load_json()
 
     def _init_json_file(self):
             """
@@ -387,7 +367,8 @@ class GalleryManager:
                     with open(self.json_file_path, "w", encoding="utf-8") as file:
                         json.dump([], file, indent=4, ensure_ascii=False)
 
-    def _load_galleries(self):
+
+    def _load_json(self):
         """
         从JSON文件加载图库信息并创建图库实例
         """
@@ -398,6 +379,28 @@ class GalleryManager:
                 gallery = Gallery(gallery_info, self.galleries_dir)
                 self.galleries[gallery.name] = gallery
 
+    def _init_galleries(self):
+        """
+        初始化图库文件夹，
+        确保“总目录->子目录->图片”结构，
+        同时删除非图片文件和空子目录，
+        加载图库实例
+        """
+        self.galleries_dir.mkdir(parents=True, exist_ok=True)
+        # 遍历总目录
+        for item in self.galleries_dir.iterdir():
+            # 确保总目录下一级全为子目录
+            if not item.is_dir():
+                item.unlink()
+            # 确保子目录下全为图片
+            for file in item.iterdir():
+                if not self.is_image_file(file):
+                    file.unlink()
+            # 将文件夹加载成图库实例
+            self.galleries
+            gallery_info = {"name": item.name}
+            self.add_gallery(gallery_info)
+
 
     def is_image_file(self, file_path: Path) -> bool:
         """
@@ -405,6 +408,8 @@ class GalleryManager:
         :param file_path: 文件路径
         :return: 是否为图片文件
         """
+        if not file_path.is_file():
+            return False
         image_extensions = {
             ".jpg",
             ".jpeg",
