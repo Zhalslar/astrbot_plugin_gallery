@@ -1,63 +1,132 @@
 {
-    "min_msg_length": {
-        "description": "用户消息最小长度",
-        "type": "int",
-        "hint": "不超过此长度时不进行图库匹配",
-        "default": 1
-    },
-    "max_msg_length": {
-        "description": "用户消息最大长度",
-        "type": "int",
-        "hint": "超过此长度时不进行图库匹配",
-        "default": 20
-    },
-    "default_compress_switch": {
-        "description": "存图时是否默认压缩图片",
-        "type": "bool",
-        "hint": "不超过此长度时不响应",
-        "default": true
-    },
-    "compress_size": {
-        "description": "压缩阈值",
-        "type": "int",
-        "hint": "单位为像素，图片在512像素以下时qq以小图显示",
-        "default": 512
-    },
-    "default_duplicate_switch": {
-        "description": "是否允许图库中图片重复",
-        "type": "bool",
+    "user_config": {
+        "description": "用户消息触发",
+        "type": "object",
         "hint": "",
-        "default": false
+        "items": {
+            "user_min_msg_len": {
+                "description": "用户消息最小长度限制",
+                "type": "int",
+                "hint": "不超过此长度时不进行图库匹配",
+                "default": 1
+            },
+            "user_max_msg_len": {
+                "description": "用户消息最大长度限制",
+                "type": "int",
+                "hint": "超过此长度时不进行图库匹配",
+                "default": 20
+            },
+            "user_exact_prob": {
+                "description": "精准匹配时发图概率",
+                "type": "float",
+                "hint": "",
+                "default": 0.9
+            },
+            "user_fuzzy_prob": {
+                "description": "模糊匹配时发图概率",
+                "type": "float",
+                "hint": "",
+                "default": 0.9
+            }
+        }
     },
-    "default_fuzzy_match": {
-        "description": "是否默认模糊匹配",
-        "type": "bool",
+    "llm_config": {
+        "description": "LLM消息触发",
+        "type": "object",
         "hint": "",
-        "default": false
+        "items": {
+            "llm_min_msg_len": {
+                "description": "LLM消息最小长度限制",
+                "type": "int",
+                "hint": "不超过此长度时不进行图库匹配",
+                "default": 1
+            },
+            "llm_max_msg_len": {
+                "description": "LLM消息最大长度限制",
+                "type": "int",
+                "hint": "超过此长度时不进行图库匹配",
+                "default": 20
+            },
+            "llm_exact_prob": {
+                "description": "精准匹配LLM消息时的发图概率",
+                "type": "float",
+                "hint": "",
+                "default": 0.9
+            },
+            "llm_fuzzy_prob": {
+                "description": "模糊匹配LLM消息时的发图概率",
+                "type": "float",
+                "hint": "",
+                "default": 0.9
+            }
+        }
     },
-    "exact_match_prob": {
-        "description": "# 精准匹配时发图概率",
-        "type": "float",
+    "add_default_config": {
+        "description": "存图时默认的参数配置",
+        "type": "object",
         "hint": "",
-        "default": 0.9
+        "items": {
+            "default_compress_switch": {
+                "description": "存图时是否默认压缩图片",
+                "type": "bool",
+                "hint": "不超过此长度时不响应",
+                "default": true
+            },
+            "compress_size": {
+                "description": "压缩阈值",
+                "type": "int",
+                "hint": "单位为像素，图片在512像素以下时qq以小图显示",
+                "default": 512
+            },
+            "default_duplicate_switch": {
+                "description": "是否允许图库中图片重复",
+                "type": "bool",
+                "hint": "",
+                "default": false
+            },
+            "default_fuzzy_match": {
+                "description": "是否默认模糊匹配",
+                "type": "bool",
+                "hint": "",
+                "default": false
+            },
+            "label_max_length": {
+                "description": "图库名最大长度",
+                "type": "int",
+                "hint": "单位为字符",
+                "default": 4
+            },
+            "max_pic_count": {
+                "description": "图库的默认容量上限",
+                "type": "int",
+                "hint": "图库中的图片数量不能超过此值",
+                "default": 200
+            }
+        }
     },
-    "fuzzy_match_prob": {
-        "description": "# 模糊匹配时发图概率",
-        "type": "float",
-        "hint": "",
-        "default": 0.9
-    },
-    "label_max_length": {
-        "description": "图库名最大长度()",
-        "type": "int",
-        "hint": "汉字为单位，一个字母相当于0.5714个汉字",
-        "default": 4
-    },
-    "max_pic_count": {
-        "description": "图库的默认容量上限",
-        "type": "int",
-        "hint": "图库中的图片数量不能超过此值",
-        "default": 1
+    "perm_config": {
+        "description": "权限设置",
+        "type": "object",
+        "hint": "以下是公共图库的权限设置，个人图库默认只能由本人或管理员操作",
+        "items": {
+            "allow_add": {
+                "description": "允许非管理员向公共图库添加图片",
+                "type": "bool",
+                "hint": "图库的图片太少时建议打开，不过要小心被别人塞进不好的图片",
+                "default": true
+            },
+            "allow_del": {
+                "description": "允许非管理员删除公共图库的图片",
+                "type": "bool",
+                "hint": "建议关闭",
+                "default": false
+            },
+            "allow_view": {
+                "description": "允许非管理员查看公共图库的图片",
+                "type": "bool",
+                "hint": "建议打开",
+                "default": true
+            }
+        }
     }
-
 }

@@ -1,21 +1,12 @@
+import asyncio
 from datetime import datetime
 import io
-import json
 from pathlib import Path
 import random
-from typing import Dict
+import re
 from PIL import Image
 from astrbot import logger
 from ..core.merge import create_merged_image
-
-# 图库数据存储路径
-GALLERIES_DIR = Path("data/plugins_data") / "astrbot_plugin_gallery"
-# 存储图库信息的 JSON 文件
-RESOURCE_DIR: Path = Path(__file__).resolve().parent / "resource"
-GALLERIES_INFO_FILE = RESOURCE_DIR / "gallery_info.json"
-
-SUPERUSERS = ["123456789"]  # 超级用户列表
-
 
 class Gallery:
     """
@@ -39,7 +30,7 @@ class Gallery:
         # 图库创建时间
         self.creation_time: datetime = gallery_info.get("creation_time", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         # 访问密码
-        self.password: str  = gallery_info.get("password", "114514")
+        self.password: str  = gallery_info.get("password", "0")
         # 图库容量上限
         self.max_capacity: int = gallery_info.get("max_capacity", 200)
         # 新增图片时是否压缩
@@ -52,6 +43,8 @@ class Gallery:
         self.keywords: list[str] = gallery_info.get("keywords", [self.name])
         # 初始化图库目录
         self.path.mkdir(parents=True, exist_ok=True)
+        # 异步处理图片文件名
+        asyncio.create_task(self._process_images_async())
 
     def to_dict(self):
         """
@@ -71,20 +64,28 @@ class Gallery:
             "keywords": self.keywords,
         }
 
-    def __str__(self):
-        """返回图库的详细信息"""
-        return (
-            f"图库名称：{self.name}\n"
-            f"图库路径：{self.path}\n"
-            f"创建者ID：{self.creator_id}\n"
-            f"创建者名称：{self.creator_name}\n"
-            f"创建时间：{self.creation_time}\n"
-            f"容量上限：{self.max_capacity}\n"
-            f"是否压缩图片：{self.compress_switch}\n"
-            f"是否允许重复：{self.duplicate_switch}\n"
-            f"是否模糊匹配：{self.fuzzy_match}\n"
-            f"图库匹配词：{self.keywords}"
-        )
+    async def _process_images_async(self):
+        """
+        异步处理图库文件夹中的图片文件名，使其符合命名格式
+        """
+        image_files = [img for img in self.path.iterdir() if img.is_file()]
+        for image_file in image_files:
+             # 检查文件名是否符合指定格式
+            if not re.match(r"^[^_]+_\d+_[^_]+\.\w+$", image_file.name):
+                with open(image_file, "rb") as f:
+                    image_bytes = f.read()
+                new_name = self._generate_image_name(image_bytes, image_label="system")
+                if new_name != image_file.name:
+                    try:
+                        new_path = self.path / new_name
+                        image_file.rename(new_path)
+                        logger.info(f"图片文件名更新：{image_file.name} -> {new_name}")
+                    except Exception as e:
+                        logger.error(
+                            f"重命名图片失败：{image_file.name} -> {new_name}，错误：{e}"
+                        )
+                # 加入延时操作，避免高负载时造成性能问题
+                await asyncio.sleep(0.1)
 
     def delete(self) -> bool:
         """删除图库"""
@@ -114,46 +115,6 @@ class Gallery:
         else:
             return f"图库【{self.name}】中不存在图{index} "
 
-    def set_password(self, password: str):
-        """设置图库访问密码"""
-        self.password = password
-        logger.info(f"图库访问密码：{password}")
-
-
-    def set_max_capacity(self, max_capacity: int):
-        """设置图库容量上限"""
-        if max_capacity > 0:
-            self.max_capacity = max_capacity
-            logger.info(f"图库容量上限：{max_capacity}")
-        else:
-            logger.error(f"图库容量上限错误：{max_capacity}，必须大于0")
-
-    def set_compress_switch(self, compress_switch: bool):
-        """设置图库新增图片时是否压缩"""
-        self.compress_switch = compress_switch
-
-
-    def set_duplicate_switch(self, duplicate_switch: bool):
-        """设置图库新增图片时是否允许重复图片"""
-        self.duplicate_switch = duplicate_switch
-
-
-    def add_keyword(self, keyword: str) -> str:
-        """添加图库匹配词"""
-        if keyword not in self.keywords:
-            self.keywords.append(keyword)
-            return f"图库【{self.name}】新增匹配词：{keyword}"
-        else:
-            return f"图库【{self.name}】已存在该匹配词"
-
-    def delete_keyword(self, keyword: str) -> str:
-        """删除图库匹配词"""
-        if keyword in self.keywords:
-            self.keywords.remove(keyword)
-            return f"已删除图库【{self.name}】的匹配词“{keyword}”"
-        else:
-            return f"图库【{self.name}】不存在匹配词“{keyword}”"
-
     def get_image_names(self) -> str:
         """获取图库中的所有图片的名称"""
         if self.path.exists():
@@ -176,44 +137,37 @@ class Gallery:
         else:
             return f"图库【{self.name}】不存在"
 
-    def check_permitted(self, user_label: str, user_id: str | None = None) -> bool:
-        """检查用户是否有权限访问图库"""
-        if user_id and user_id in SUPERUSERS:
-            return True
-        if self.path.is_dir():
-            return user_label == self.path.name
-        if not self.path.exists() or not self.path.is_file():
-            return False
-        return False
-        # pattern = r"^(?P<gallery_name>[^_]+)_(?P<number>\d+)_(?P<label>[^.]+)\.[^.]+$"
-        # match = re.match(pattern, self.path.name)
-        # if not match:
-        #     return False
-        # return user_label == match.group("gallery_name") or user_label == match.group(
-        #     "label"
-        # )
 
-    def _generate_image_name(self, image_bytes: bytes, image_label: str):
-        """生成图片名称"""
-        # 获取拓展名
+    def _generate_image_name(
+        self, image_bytes: bytes, image_label: str, index: int = 0
+    ):
+        """
+        生成图片名称，根据图片的字节数据、标签和序号生成文件名。
+        如果未指定序号，则自动生成一个唯一的序号。
+        """
+        # 获取图片格式
         with Image.open(io.BytesIO(image_bytes)) as img:
             extension = img.format.lower() if img.format else "jpg"
 
-        #  以图片编号生成唯一的图片文件名，取用最小的可用编号
-        existing_numbers = set()
-        for file in self.path.iterdir():
-            if file.is_file():
-                parts = file.stem.split("_")
-                if parts[1].isdigit():
-                    existing_numbers.add(int(parts[1]))
-        pic_num = 1
-        while pic_num in existing_numbers:
-            pic_num += 1
-        return f"{self.name}_{pic_num}_{image_label}.{extension}"
+        # 如果未指定图片序号，则自动生成唯一的序号
+        if index == 0:
+            existing_numbers = [
+                int(file.stem.split("_")[1])
+                for file in self.path.iterdir()
+                if file.is_file()
+                and len(file.stem.split("_")) > 1
+                and file.stem.split("_")[1].isdigit()
+            ]
+            index = 1
+            while index in existing_numbers:
+                index += 1
 
-    def add_image(self, image_bytes: bytes, image_label: str) -> str:
+        # 生成图片文件名
+        return f"{self.name}_{index}_{image_label}.{extension}"
+
+    def add_image(self, image_bytes: bytes, image_label: str, index: int = 0) -> str:
         """传递bytes，添加图片到图库"""
-        image_name = self._generate_image_name(image_bytes, image_label)
+        image_name = self._generate_image_name(image_bytes, image_label, index)
 
         # 不能超过图库容量上限
         if len(list(self.path.iterdir())) >= self.max_capacity:
@@ -322,263 +276,3 @@ class Gallery:
             logger.error(f"压缩图片失败：{e}")
             return
 
-
-
-class GalleryManager:
-    """
-    图库管理器类，负责管理所有图库的创建、删除和操作
-    内部维护一个图库列表，用json文件存储图库信息
-    """
-
-    def __init__(self, galleries_dir: Path, json_file_path: Path):
-        """
-        初始化图库管理器
-        :param json_file_path: 存储图库信息的JSON文件路径
-        :param galleries_dir: 图库的根目录路径
-        """
-        self.json_file_path: Path = json_file_path
-        self.galleries_dir: Path = galleries_dir
-        self.galleries: Dict[str, Gallery] = {}  # 使用字典存储图库实例，键为gallery.name
-        self._init_json_file()  # 初始化JSON文件
-        self._init_galleries()  # 初始化图库文件夹
-        self._load_json()
-
-    def _init_json_file(self):
-            """
-            初始化JSON文件，
-            如果文件不存在，则创建一个空的JSON文件。
-            如果文件存在但内容为空或不是有效的JSON列表，则重置为一个空列表。
-            """
-            # 检查文件是否存在
-            if not self.json_file_path.exists():
-                # 如果文件不存在，创建一个包含空列表的JSON文件
-                with open(self.json_file_path, "w", encoding="utf-8") as file:
-                    json.dump([], file, indent=4, ensure_ascii=False)
-            else:
-                # 如果文件存在，尝试读取并验证内容
-                try:
-                    with open(self.json_file_path, "r", encoding="utf-8") as file:
-                        data = json.load(file)
-                    # 确保文件内容是一个列表
-                    if not isinstance(data, list):
-                        raise ValueError("文件内容不是列表格式")
-                except (json.JSONDecodeError, ValueError):
-                    # 如果文件内容为空、损坏或不是列表，重置为一个空列表
-                    with open(self.json_file_path, "w", encoding="utf-8") as file:
-                        json.dump([], file, indent=4, ensure_ascii=False)
-
-
-    def _load_json(self):
-        """
-        从JSON文件加载图库信息并创建图库实例
-        """
-        if self.json_file_path.exists():
-            with open(self.json_file_path, "r", encoding="utf-8") as file:
-                galleries_data = json.load(file)
-            for gallery_info in galleries_data:
-                gallery = Gallery(gallery_info, self.galleries_dir)
-                self.galleries[gallery.name] = gallery
-
-    def _init_galleries(self):
-        """
-        初始化图库文件夹，
-        确保“总目录->子目录->图片”结构，
-        同时删除非图片文件和空子目录，
-        加载图库实例
-        """
-        self.galleries_dir.mkdir(parents=True, exist_ok=True)
-        # 遍历总目录
-        for item in self.galleries_dir.iterdir():
-            # 确保总目录下一级全为子目录
-            if not item.is_dir():
-                item.unlink()
-            # 确保子目录下全为图片
-            for file in item.iterdir():
-                if not self.is_image_file(file):
-                    file.unlink()
-            # 将文件夹加载成图库实例
-            self.galleries
-            gallery_info = {"name": item.name}
-            self.add_gallery(gallery_info)
-
-
-    def is_image_file(self, file_path: Path) -> bool:
-        """
-        定义哪些扩展名被认为是图片
-        :param file_path: 文件路径
-        :return: 是否为图片文件
-        """
-        if not file_path.is_file():
-            return False
-        image_extensions = {
-            ".jpg",
-            ".jpeg",
-            ".png",
-            ".gif",
-            ".bmp",
-            ".webp",
-            ".tiff",
-            ".ico",
-        }
-        return file_path.suffix.lower() in image_extensions
-
-
-    def save_galleries(self):
-        """
-        将当前管理的图库信息保存到JSON文件
-        """
-        galleries_data = [gallery.to_dict() for gallery in self.galleries.values()]
-        with open(self.json_file_path, "w", encoding="utf-8") as file:
-            json.dump(galleries_data, file, indent=4, ensure_ascii=False)
-
-    def add_gallery(self, gallery_info: dict) -> Gallery | None:
-        """
-        添加新的图库
-        :param gallery_info: 图库信息字典
-        """
-        if gallery_info["name"] not in [gallery.name for gallery in self.galleries.values()]:
-            gallery = Gallery(gallery_info, self.galleries_dir)
-            self.galleries[gallery.name] = gallery
-            self.save_galleries()
-            return gallery
-
-    def delete_gallery(self, gallery_name: str) -> bool:
-        """
-        根据图库名删除图库
-        :param gallery_name: 图库名
-        """
-        if gallery_name in self.galleries:
-            gallery = self.galleries[gallery_name]
-            gallery.delete()  # 删除图库文件夹
-            del self.galleries[gallery_name] # 从字典中删除图库实例
-            self.save_galleries()
-            return True
-        else:
-            logger.error(f"图库不存在：{gallery_name}")
-            return False
-
-    def get_gallery(self, gallery_name: str) -> Gallery | None:
-        """
-        根据图库名获取图库实例
-        :param gallery_name: 图库名
-        :return: Gallery实例
-        """
-        return self.galleries.get(gallery_name)
-
-    def list_galleries(self) -> list[dict]:
-        """
-        返回所有图库的基本信息
-        :return: 图库信息列表
-        """
-        return [gallery.to_dict() for gallery in self.galleries.values()]
-
-    def get_gallery_by_name(self, name: str) -> Gallery | None:
-        """
-        根据图库名称获取图库实例
-        :param name: 图库名称
-        :return: Gallery实例
-        """
-        return self.galleries.get(name)
-    def get_gallery_by_keyword(self, keyword: str) -> list[Gallery]:
-        """
-        根据关键词获取图库实例列表
-        :param keyword: 关键词
-        :return: Gallery实例列表
-        """
-        return [
-            gallery for gallery in self.galleries.values() if keyword in gallery.keywords
-        ]
-    def get_gallery_by_creator(self, creator_id: str) -> list[Gallery]:
-        """
-        根据创建者ID获取图库实例列表
-        :param creator_id: 创建者ID
-        :return: Gallery实例列表
-        """
-        return [
-            gallery for gallery in self.galleries.values() if gallery.creator_id == creator_id
-        ]
-    def get_gallery_by_password(self, password: str) -> list[Gallery]:
-        """
-        根据密码获取图库实例列表
-        :param password: 密码
-        :return: Gallery实例列表
-        """
-        return [
-            gallery for gallery in self.galleries.values() if gallery.password == password
-        ]
-    def get_gallery_by_fuzzy_match(self, fuzzy_match: bool) -> list[Gallery]:
-        """
-        根据模糊匹配获取图库实例列表
-        :param fuzzy_match: 模糊匹配开关
-        :return: Gallery实例列表
-        """
-        return [
-            gallery for gallery in self.galleries.values() if gallery.fuzzy_match == fuzzy_match
-        ]
-    def get_gallery_by_compress_switch(self, compress_switch: bool) -> list[Gallery]:
-        """
-        根据压缩开关获取图库实例列表
-        :param compress_switch: 压缩开关
-        :return: Gallery实例列表
-        """
-        return [
-            gallery for gallery in self.galleries.values() if gallery.compress_switch == compress_switch
-        ]
-    def get_gallery_by_duplicate_switch(self, duplicate_switch: bool) -> list[Gallery]:
-        """
-        根据重复开关获取图库实例列表
-        :param duplicate_switch: 重复开关
-        :return: Gallery实例列表
-        """
-        return [
-            gallery for gallery in self.galleries.values() if gallery.duplicate_switch == duplicate_switch
-        ]
-    def get_gallery_by_creation_time(self, creation_time: datetime) -> list[Gallery]:
-        """
-        根据创建时间获取图库实例列表
-        :param creation_time: 创建时间
-        :return: Gallery实例列表
-        """
-        return [
-            gallery for gallery in self.galleries.values() if gallery.creation_time == creation_time
-        ]
-    def get_gallery_by_creator_name(self, creator_name: str) -> list[Gallery]:
-        """
-        根据创建者名称获取图库实例列表
-        :param creator_name: 创建者名称
-        :return: Gallery实例列表
-        """
-        return [
-            gallery for gallery in self.galleries.values() if gallery.creator_name == creator_name
-        ]
-    def get_gallery_by_keywords(self, keywords: list[str]) -> list[Gallery]:
-        """
-        根据关键词获取图库实例列表
-        :param keywords: 关键词列表
-        :return: Gallery实例列表
-        """
-        return [
-            gallery for gallery in self.galleries.values() if any(keyword in gallery.keywords for keyword in keywords)
-        ]
-
-    def get_fuzzy_match_keywords(self) -> list[str]:
-        """
-        获取所有模糊匹配的图库的关键词，组合成列表
-        :return: 关键词列表
-        """
-        keywords = []
-        for gallery in self.galleries.values():
-            if gallery.fuzzy_match:
-                keywords.extend(gallery.keywords)
-        return keywords
-
-    def get_exact_match_keywords(self) -> list[str]:
-        """
-        获取所有精准匹配的图库的关键词，组合成列表
-        :return: 关键词列表
-        """
-        keywords = []
-        for gallery in self.galleries.values():
-            if not gallery.fuzzy_match:
-                keywords.extend(gallery.keywords)
-        return keywords

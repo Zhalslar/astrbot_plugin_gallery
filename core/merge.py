@@ -2,17 +2,17 @@ import os
 from io import BytesIO
 from pathlib import Path
 import time
+from astrbot import logger
 
 from PIL import Image, ImageDraw, ImageFont
 
-RESOURCE_DIR: Path = Path("data/plugins/astrbot_plugin_gallery") / "resource"
-FONT_PATH: Path = RESOURCE_DIR / "msyh.ttf"
+FONT_PATH: Path = Path("data/plugins/astrbot_plugin_gallery/zzgf_dianhei.otf")
 
 
 def process_image(img_path, sequence_number, font, thumbnail_size) -> Image.Image|None:
     try:
         # 打开图片并转换为RGBA模式
-        img = Image.open(img_path).convert("RGBA")
+        img = Image.open(img_path).convert("RGB")
 
         # 如果是GIF，取第一帧
         if img.format == "GIF":
@@ -33,7 +33,7 @@ def process_image(img_path, sequence_number, font, thumbnail_size) -> Image.Imag
 
         # 计算文本的居中位置
         text_x = (thumbnail_size[0] - text_width) // 2
-        text_y = thumbnail_size[1] - text_height - 15  # 序号距离图片底部15像素
+        text_y = thumbnail_size[1] - text_height - 1
 
         # 计算圆形背景的半径
         radius = max(text_width, text_height) // 2 + 1  # 给圆形增加一些间距
@@ -44,10 +44,10 @@ def process_image(img_path, sequence_number, font, thumbnail_size) -> Image.Imag
         circle_x2 = text_x + text_width + radius // 2
         circle_y2 = text_y + text_height // 2 + radius * 2 + 5
 
-        # 绘制半透明白色圆形背景
+        # 绘制白色圆形背景
         draw.ellipse(
             [(circle_x1, circle_y1), (circle_x2, circle_y2)],
-            fill=(255, 255, 255, 230),  # 半透明白色背景
+            fill=(255, 255, 255),
         )
 
         # 在图片中下方绘制序号，颜色为黑色
@@ -55,15 +55,13 @@ def process_image(img_path, sequence_number, font, thumbnail_size) -> Image.Imag
 
         return img
     except Exception as e:
-        print(f"加载图片 {img_path} 时出错：{e}")
+        logger.error(f"加载图片 {img_path} 时出错：{e}")
         return None
 
 
 def create_merged_image(folder_path: str) -> bytes|None:
     # 图片缩放尺寸
     thumbnail_size = (128, 128)
-
-    font_size = 25  # 设置序号字号为25
 
     # 获取文件夹内所有图片文件名，并按序号排序
     image_files = sorted(
@@ -77,7 +75,7 @@ def create_merged_image(folder_path: str) -> bytes|None:
 
     # 检查是否有图片文件
     if not image_files:
-        print("没有找到符合条件的图片文件，请检查文件夹路径和文件格式。")
+        logger.warning("没有找到符合条件的图片文件，请检查文件夹路径和文件格式")
         return None
 
     # 根据图片数量决定每行显示的图片数量
@@ -94,11 +92,9 @@ def create_merged_image(folder_path: str) -> bytes|None:
         + (1 if len(image_files) % images_per_row != 0 else 0)
     )
 
-    merged_image = Image.new(
-        "RGBA", (width, height), (255, 255, 255, 0)
-    )  # 使用 RGBA 模式
+    merged_image = Image.new("RGB", (width, height), (255, 255, 255))
 
-    font = ImageFont.truetype(str(FONT_PATH), font_size)
+    font = ImageFont.truetype(FONT_PATH, 15)
 
     # 顺序处理图片，避免并行带来的高CPU占用
     for i, image_file in enumerate(image_files):
@@ -116,5 +112,5 @@ def create_merged_image(folder_path: str) -> bytes|None:
         time.sleep(0.05)
 
     byte_arr = BytesIO()
-    merged_image.save(byte_arr, format="PNG")
+    merged_image.save(byte_arr, format="JPEG")
     return byte_arr.getvalue()
