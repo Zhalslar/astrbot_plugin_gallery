@@ -177,6 +177,10 @@ class Gallery:
             if result := self.compress_image(image_bytes):  # 压缩图片
                 image_bytes = result
 
+        if self.duplicate_switch:
+            if result := self.find_duplicate(image_bytes):  # 去重图片
+                return f"图库【{self.name}】中已存在该图片"
+
         if self.path.exists():
             image_path = self.path / image_name
             with open(image_path, "wb") as f:
@@ -228,14 +232,14 @@ class Gallery:
         files = [file for file in self.path.iterdir() if file.is_file()]
         return random.choice(files) if files else None
 
-    def find_duplicate(self, image: bytes) -> str:
+    def find_duplicate(self, image: bytes) -> str | None:
         """检查图库中是否有重复图片"""
         for filename in self.path.iterdir():
             if filename.is_file():
                 with open(filename, "rb") as file:
                     if file.read() == image:
                         return filename.name
-        return f"图库【{self.name}】中没找到重复图片"
+
 
     def remove_duplicates(self):
         """删除图库中的重复图片"""

@@ -30,7 +30,7 @@ GALLERIES_INFO_FILE = Path("data/plugins_data") / "astrbot_plugin_gallery_info.j
     "astrbot_plugin_gallery",
     "Zhalslar",
     "本地图库管理器",
-    "1.0.3",
+    "1.0.4",
     "https://github.com/Zhalslar/astrbot_plugin_gallery",
 )
 class GalleryPlugin(Star):
