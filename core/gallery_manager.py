@@ -6,6 +6,7 @@ import aiofiles
 from astrbot import logger
 from .gallery import Gallery
 
+
 class GalleryManager:
     """
     图库管理器类，负责管理所有图库的创建、删除和操作
@@ -22,7 +23,6 @@ class GalleryManager:
         self.galleries_dir: Path = galleries_dir
         self.galleries_dir.mkdir(parents=True, exist_ok=True)
         self.galleries = {}
-        self.save_buffer = []
 
     async def initialize(self):
         """
@@ -33,6 +33,8 @@ class GalleryManager:
         logger.info("Json文件初始化完成")
         await self._load_json()
         logger.info("图库实例化完成")
+        await self._sync_with_filesystem()
+        logger.info("图库与文件系统同步完成")
 
     async def _init_json_file(self):
         """
@@ -74,6 +76,33 @@ class GalleryManager:
             ]
             await asyncio.gather(*tasks)
 
+    async def _sync_with_filesystem(self):
+        """
+        将实例与文件夹同步：
+        - 添加文件夹中有但实例中没有的图库
+        - 删除实例中有但文件夹不存在的图库
+        """
+        # 当前图库实例的名称集合
+        current_gallery_names = set(self.galleries.keys())
+
+        # 实际文件夹名称集合
+        actual_folder_names = {
+            folder.name for folder in self.galleries_dir.iterdir() if folder.is_dir()
+        }
+
+        # 添加新增的文件夹为图库实例
+        for folder_name in actual_folder_names - current_gallery_names:
+            gallery_info = {"name": folder_name}
+            await self.add_gallery(gallery_info)
+            logger.info(f"已加载新图库文件夹为实例：{folder_name}")
+
+        # 删除不存在文件夹的图库实例
+        for gallery_name in current_gallery_names - actual_folder_names:
+            await self.delete_gallery(gallery_name)
+            logger.warning(f"已删除失效图库实例：{gallery_name}")
+
+        await self.save_galleries()
+
     def is_image_file(self, file: Path):
         """
         判断文件是否为图片
@@ -82,7 +111,7 @@ class GalleryManager:
 
     async def _create_gallery_instance(self, gallery_info):
         """
-        批量创建图库实例
+        创建图库实例
         """
         gallery = Gallery(gallery_info, self.galleries_dir)
         self.galleries[gallery.name] = gallery
@@ -94,7 +123,6 @@ class GalleryManager:
         galleries_data = [gallery.to_dict() for gallery in self.galleries.values()]
         async with aiofiles.open(self.json_file_path, "w", encoding="utf-8") as file:
             await file.write(json.dumps(galleries_data, indent=4, ensure_ascii=False))
-        self.save_buffer.clear()  # 清空缓存
 
     async def add_gallery(self, gallery_info: dict) -> Gallery:
         """
@@ -105,7 +133,7 @@ class GalleryManager:
         if gallery_name not in self.galleries:
             gallery = Gallery(gallery_info, self.galleries_dir)
             self.galleries[gallery.name] = gallery
-            self.save_buffer.append(gallery)
+            await self.save_galleries()
             return gallery
         return self.galleries[gallery_name]
 
@@ -118,7 +146,7 @@ class GalleryManager:
             gallery = self.galleries[gallery_name]
             gallery.delete()  # 删除图库文件夹
             del self.galleries[gallery_name]  # 从字典中删除图库实例
-            self.save_buffer.append(gallery)  # 缓存删除操作
+            await self.save_galleries()
             return True
         else:
             logger.error(f"图库不存在：{gallery_name}")
@@ -145,7 +173,7 @@ class GalleryManager:
             gallery.password = password
             logger.info(f"图库访问密码：{password}")
             await self.save_galleries()
-            return  f"图库【{gallery_name}】密码已设置"
+            return f"图库【{gallery_name}】密码已设置"
         return f"图库【{gallery_name}】不存在"
 
     async def set_fuzzy_match(self, gallery_name: str, fuzzy_match: bool):
@@ -167,7 +195,7 @@ class GalleryManager:
                 return f"图库容量上限错误：{max_capacity}，必须大于0"
         return f"图库【{gallery_name}】不存在"
 
-    async def set_compress_switch(self, gallery_name: str, compress:  bool):
+    async def set_compress_switch(self, gallery_name: str, compress: bool):
         """设置图库新增图片时是否压缩"""
         if gallery := self.get_gallery(gallery_name):
             gallery.compress_switch = compress

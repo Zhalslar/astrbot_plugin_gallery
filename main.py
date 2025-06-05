@@ -31,7 +31,7 @@ GALLERIES_INFO_FILE = Path("data/plugins_data") / "astrbot_plugin_gallery_info.j
     "astrbot_plugin_gallery",
     "Zhalslar",
     "本地图库管理器",
-    "1.0.5",
+    "1.0.6",
     "https://github.com/Zhalslar/astrbot_plugin_gallery",
 )
 class GalleryPlugin(Star):
@@ -383,7 +383,7 @@ class GalleryPlugin(Star):
         gallery_label = self._get_label(event, gallery_name)
         gallery = self._get_gallary(event, gallery_label)
         if not gallery:
-            yield event.plain_result("未找到对应图库")
+            yield event.plain_result(f"未找到图库【{gallery_label}】")
             return
 
         if not self.allow_del or gallery.password != "0":
@@ -417,7 +417,7 @@ class GalleryPlugin(Star):
         gallery_label = self._get_label(event, gallery_name)
         gallery = self._get_gallary(event, gallery_label)
         if not gallery:
-            yield event.plain_result("未找到对应图库")
+            yield event.plain_result(f"未找到图库【{gallery_label}】")
             return
 
         if not self.allow_view or gallery.password != "0":
