@@ -85,7 +85,7 @@ class GalleryPlugin(Star):
             "name": "Unknown",
             "creator_id": "Unknown",
             "creator_name": "Unknown",
-            "password": 0,
+            "password": "0",
             "max_capacity": self.max_pic_count,
             "compress_switch": self.default_compress_switch,
             "duplicate_switch": self.default_duplicate_switch,
@@ -475,7 +475,7 @@ class GalleryPlugin(Star):
             yield event.plain_result(f"未找到图库【{gallery_label}】")
             return
 
-        if not self.allow_view or gallery.password != "0":
+        if not self.allow_view or gallery.password not in ["0",0]:
             if not event.is_admin() and event.get_sender_id() != gallery.password:
                 yield event.plain_result("你无权访问此图库")
                 return
