@@ -128,5 +128,30 @@
                 "default": true
             }
         }
+    },
+    "auto_collect_config": {
+        "description": "自动收集设置",
+        "type": "object",
+        "hint": "当图库的图片较少时，可以打开自动收集功能，将自动收集用户图片，存到每个人对应的图库",
+        "items": {
+            "enable_collect": {
+                "description": "启用自动收集",
+                "type": "bool",
+                "hint": "",
+                "default": true
+            },
+            "white_list": {
+                "description": "启用自动收集的群聊白名单",
+                "type": "list",
+                "hint": "不填表示启用所有群聊",
+                "default": []
+            },
+            "max_size": {
+                "description": "收集的图片大小限制",
+                "type": "int",
+                "hint": "单位为MB, 超过此大小时不收集此图片",
+                "default": 6
+            }
+        }
     }
 }
