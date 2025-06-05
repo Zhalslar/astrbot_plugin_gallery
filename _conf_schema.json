@@ -82,7 +82,7 @@
                 "description": "存图时自动去重",
                 "type": "bool",
                 "hint": "",
-                "default": false
+                "default": true
             },
             "default_fuzzy_match": {
                 "description": "自动设置为模糊匹配",
@@ -94,7 +94,7 @@
                 "description": "图库名最大长度",
                 "type": "int",
                 "hint": "单位为字符",
-                "default": 4
+                "default": 10
             },
             "max_pic_count": {
                 "description": "图库的默认容量上限",
