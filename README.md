@@ -74,7 +74,7 @@ git clone https://github.com/Zhalslar/astrbot_plugin_gallery
 - [x] 支持热重载（存图、删图实时生效）
 - [x] 支持将批量图片拖入文件夹进行加载
 - [x] LLM调用图片
-- [ ] 自动收集图片
+- [x] 自动收集图片
 
 ## 👥 贡献指南
 
