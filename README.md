@@ -33,6 +33,10 @@ git clone https://github.com/Zhalslar/astrbot_plugin_gallery
 
 ## ⌨️ 使用说明
 
+图片存储目录：data\plugins_data\astrbot_plugin_gallery
+
+### 命令表
+
 `/图库帮助` - 查看以下的帮助菜单(标有s表示可输入多个,空格隔开参数,图库名皆可用@某人代替)
 
 | 命令 | 描述 | 示例用法 |
