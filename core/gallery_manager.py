@@ -92,7 +92,16 @@ class GalleryManager:
 
         # 添加新增的文件夹为图库实例
         for folder_name in actual_folder_names - current_gallery_names:
-            gallery_info = {"name": folder_name}
+            gallery_info = {
+                "name": folder_name,
+                "creator_id": "Unknown",
+                "creator_name": "Unknown",
+                "password": 0,
+                "max_capacity": 200,
+                "compress_switch": True,
+                "duplicate_switch": True,
+                "fuzzy_match": False,
+            }
             await self.add_gallery(gallery_info)
             logger.info(f"已加载新图库文件夹为实例：{folder_name}")
 
