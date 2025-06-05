@@ -1,6 +1,6 @@
 name: astrbot_plugin_gallery # 这是你的插件的唯一识别名。
 desc: 【本地图库管理器】-帮助用户组建、管理、调用本地图库，可用于表情包收集管理、图床管理、为其他插件提供动态图库等等 # 插件简短描述
 help: 使用 /图库帮助 查看帮助信息  # 插件的帮助信息
-version: v1.0.4 # 插件版本号。格式：v1.1.1 或者 v1.1
+version: v1.0.5 # 插件版本号。格式：v1.1.1 或者 v1.1
 author: Zhalslar # 作者
 repo: https://github.com/Zhalslar/astrbot_plugin_gallery # 插件的仓库地址

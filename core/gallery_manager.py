@@ -167,20 +167,20 @@ class GalleryManager:
                 return f"图库容量上限错误：{max_capacity}，必须大于0"
         return f"图库【{gallery_name}】不存在"
 
-    async def set_compress_switch(self, gallery_name: str):
+    async def set_compress_switch(self, gallery_name: str, compress:  bool):
         """设置图库新增图片时是否压缩"""
         if gallery := self.get_gallery(gallery_name):
-            gallery.compress_switch = not gallery.compress_switch
+            gallery.compress_switch = compress
             await self.save_galleries()
-            return f"图库【{gallery.name}】压缩图片: {gallery.compress_switch}"
+            return f"图库【{gallery.name}】压缩开关: {gallery.compress_switch}"
         return f"图库【{gallery_name}】不存在"
 
-    async def set_duplicate_switch(self, gallery_name: str):
+    async def set_duplicate_switch(self, gallery_name: str, duplicate: bool):
         """设置图库新增图片时是否允许重复图片"""
         if gallery := self.get_gallery(gallery_name):
-            gallery.duplicate_switch = not gallery.duplicate_switch
+            gallery.duplicate_switch = duplicate
             await self.save_galleries()
-            return f"图库【{gallery.name}】去重: {gallery.duplicate_switch}"
+            return f"图库【{gallery.name}】去重开关: {gallery.duplicate_switch}"
         return f"图库【{gallery_name}】不存在"
 
     async def add_keyword(self, gallery_name: str, keyword: str) -> str:

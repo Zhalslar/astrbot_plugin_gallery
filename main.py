@@ -2,6 +2,7 @@ import asyncio
 import os
 import re
 import aiohttp
+from typing import Callable, Awaitable
 from astrbot.core.provider.entities import LLMResponse
 from astrbot.core.utils.session_waiter import session_waiter, SessionController
 from data.plugins.astrbot_plugin_gallery.core.parse import get_image_info
@@ -30,12 +31,15 @@ GALLERIES_INFO_FILE = Path("data/plugins_data") / "astrbot_plugin_gallery_info.j
     "astrbot_plugin_gallery",
     "Zhalslar",
     "本地图库管理器",
-    "1.0.4",
+    "1.0.5",
     "https://github.com/Zhalslar/astrbot_plugin_gallery",
 )
 class GalleryPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
+
+        # 唤醒前缀
+        self.wake_prefix: list[str] = context.get_config()["wake_prefix"]
 
         user_config = config.get("user_config", {})
         # 用户消息长度不超过此长度时不响应
@@ -99,13 +103,14 @@ class GalleryPlugin(Star):
             ):
                 yield event.image_result(str(image_path))
 
-
     @filter.on_llm_response()
     async def on_llm_response(self, event: AstrMessageEvent, resp: LLMResponse):
         """精准匹配/模糊匹配LLM消息"""
         chain = resp.result_chain.chain
         text = (
-            chain[0].text if len(chain) == 1 and isinstance(chain[0], Comp.Plain) else ""
+            chain[0].text
+            if len(chain) == 1 and isinstance(chain[0], Comp.Plain)
+            else ""
         )
         if self.llm_min_msg_len < len(text) < self.llm_max_msg_len:
             if image_path := await self._match(
@@ -145,7 +150,7 @@ class GalleryPlugin(Star):
 
     @filter.command("模糊匹配词")
     async def list_fuzzy_keywords(self, event: AstrMessageEvent):
-        """"查看模糊匹配词"""
+        """ "查看模糊匹配词"""
         reply = f"【模糊匹配词】：\n{str(self.gm.get_fuzzy_match_keywords())}"
         yield event.plain_result(reply)
 
@@ -154,7 +159,7 @@ class GalleryPlugin(Star):
         """将图库切换到模糊匹配模式"""
         names = event.message_str.removeprefix("模糊匹配").strip().split(" ")
         for name in names:
-            gallery = self.get_gallary(event, name)
+            gallery = self._get_gallary(event, name)
             if not gallery:
                 yield event.plain_result(f"未找到图库【{name}】")
                 return
@@ -166,7 +171,7 @@ class GalleryPlugin(Star):
         """将图库切换到精准匹配模式"""
         names = event.message_str.removeprefix("模糊匹配").strip().split(" ")
         for name in names:
-            gallery = self.get_gallary(event, name)
+            gallery = self._get_gallary(event, name)
             if not gallery:
                 yield event.plain_result(f"未找到图库【{name}】")
                 return
@@ -178,10 +183,10 @@ class GalleryPlugin(Star):
         self,
         event: AstrMessageEvent,
         gallery_name: str | None = None,
-        keyword: str | None = None
+        keyword: str | None = None,
     ):
-        gallery_label = self.get_label(event, gallery_name)
-        gallery = self.get_gallary(event, gallery_label)
+        gallery_label = self._get_label(event, gallery_name)
+        gallery = self._get_gallary(event, gallery_label)
         if not gallery:
             yield event.plain_result(f"未找到图库【{gallery_label}】")
             return
@@ -196,10 +201,10 @@ class GalleryPlugin(Star):
         self,
         event: AstrMessageEvent,
         gallery_name: str | None = None,
-        keyword: str | None = None
+        keyword: str | None = None,
     ):
-        gallery_label = self.get_label(event, gallery_name)
-        gallery = self.get_gallary(event, gallery_label)
+        gallery_label = self._get_label(event, gallery_name)
+        gallery = self._get_gallary(event, gallery_label)
         if not gallery:
             yield event.plain_result(f"未找到图库【{gallery_label}】")
             return
@@ -216,8 +221,8 @@ class GalleryPlugin(Star):
         gallery_name: str | None = None,
         max_capacity: int = 0,
     ):
-        gallery_label = self.get_label(event, gallery_name)
-        gallery = self.get_gallary(event, gallery_label)
+        gallery_label = self._get_label(event, gallery_name)
+        gallery = self._get_gallary(event, gallery_label)
         if not gallery:
             yield event.plain_result(f"未找到图库【{gallery_label}】")
             return
@@ -229,62 +234,92 @@ class GalleryPlugin(Star):
         )
         yield event.plain_result(result)
 
-    @filter.command("设置压缩")
-    async def set_compress_switch(
-        self,
-        event: AstrMessageEvent,
-        gallery_name: str | None = None,
-    ):
-        gallery_label = self.get_label(event, gallery_name)
-        gallery = self.get_gallary(event, gallery_label)
-        if not gallery:
-            yield event.plain_result(f"未找到图库【{gallery_label}】")
-            return
-        result = await self.gm.set_compress_switch(gallery_label)
-        yield event.plain_result(result)
+    @filter.command("开启压缩")
+    async def open_compress_switch(self, event: AstrMessageEvent):
+        """打开图库的压缩开关"""
 
-    @filter.command("设置去重")
-    async def set_duplicate_switch(
+        async def do_switch(name):
+            return await self.gm.set_compress_switch(gallery_name=name, compress=True)
+
+        async for r in self._toggle_gallery_switch(event, "开启压缩", do_switch):
+            yield r
+
+    @filter.command("关闭压缩")
+    async def close_compress_switch(self, event: AstrMessageEvent):
+        """关闭图库的压缩开关"""
+
+        async def do_switch(name):
+            return await self.gm.set_compress_switch(gallery_name=name, compress=False)
+
+        async for r in self._toggle_gallery_switch(event, "关闭压缩", do_switch):
+            yield r
+
+    @filter.command("开启去重")
+    async def open_duplicate_switch(self, event: AstrMessageEvent):
+        """打开图库的去重开关"""
+
+        async def do_switch(name):
+            return await self.gm.set_duplicate_switch(gallery_name=name, duplicate=True)
+
+        async for r in self._toggle_gallery_switch(event, "开启去重", do_switch):
+            yield r
+
+    @filter.command("关闭去重")
+    async def close_duplicate_switch(self, event: AstrMessageEvent):
+        """关闭图库的去重开关"""
+
+        async def do_switch(name):
+            return await self.gm.set_duplicate_switch(
+                gallery_name=name, duplicate=False
+            )
+
+        async for r in self._toggle_gallery_switch(event, "关闭去重", do_switch):
+            yield r
+
+    async def _toggle_gallery_switch(
         self,
         event: AstrMessageEvent,
-        gallery_name: str | None = None,
+        prefix: str,
+        switch_func: Callable[[str], Awaitable[str]],
     ):
-        gallery_label = self.get_label(event, gallery_name)
-        gallery = self.get_gallary(event, gallery_label)
-        if not gallery:
-            yield event.plain_result(f"未找到图库【{gallery_label}】")
-            return
-        result = await self.gm.set_duplicate_switch(gallery_label)
-        yield event.plain_result(result)
+        gallery_names = event.message_str.removeprefix(prefix).strip().split(" ")
+        result = []
+        for gallery_name in gallery_names:
+            gallery_label = self._get_label(event, gallery_name)
+            gallery = self._get_gallary(event, gallery_label)
+            if not gallery:
+                result.append(f"未找到图库【{gallery_name}】")
+            else:
+                result.append(await switch_func(gallery_name))
+        yield event.plain_result("\n".join(result))
 
     @filter.command("存图")
-    async def add_image(
-        self,
-        event: AstrMessageEvent,
-        gallery_name: str | None = None,
-        index: int = 0,
-    ):
+    async def add_image(self, event: AstrMessageEvent):
         """
         存图 图库名 序号 (图库名不填则默认自己昵称，序号指定时会替换掉原图)
         """
-        label = self.get_label(event)
-        gallery_label = self.get_label(event, gallery_name)
+        args = event.message_str.removeprefix("存图").strip().split(" ")
+        gallery_name = args[0] if args and not args[0].isdigit() else None
+        index = int(args[-1]) if args and args[-1].isdigit() else 0
+
+        label = self._get_label(event)
         send_id = event.get_sender_id()
 
-        gallery = self.get_gallary(event, gallery_label)
+        gallery_label = self._get_label(event, gallery_name)
+        gallery = self._get_gallary(event, gallery_label)
 
+        # 图库不存在，则创建图库
         if not gallery:
+            at_id = self._get_at_id(event) or "0"
+            sender_name = event.get_sender_name()
             #  图库密码: 0表示公共图库不加密，否则为个人图库加密
-            at_id = self.get_at_id(event) or "0"
             password = (
-                "0"
-                if (gallery_name and not gallery_name.startswith("@"))
-                else at_id
+                "0" if (gallery_name and not gallery_name.startswith("@")) else at_id
             )
             gallery_info = {
                 "name": gallery_label,
                 "creator_id": send_id,
-                "creator_name": event.get_sender_name(),
+                "creator_name": sender_name,
                 "password": password,
                 "max_capacity": self.max_pic_count,
                 "compress_switch": self.default_compress_switch,
@@ -293,18 +328,21 @@ class GalleryPlugin(Star):
             }
             gallery = await self.gm.add_gallery(gallery_info)
 
+        #  权限验证
         if not self.allow_add or gallery.password != "0":
             if not event.is_admin() and send_id != gallery.password:
                 yield event.plain_result("你无权访问此图库")
                 return
+        #  获取图片
+        image = await self._get_image(event)
 
-        image = await self.get_image(event)
-
+        #  图片存在，直接图片处理
         if image:
             result = gallery.add_image(
                 image_bytes=image, image_label=label, index=index
             )
             yield event.plain_result(result)
+        #  图片不存在，等待用户发图片
         else:
             yield event.plain_result("发一下图片")
             group_id = event.get_group_id()
@@ -315,8 +353,8 @@ class GalleryPlugin(Star):
             ):
                 if event.get_group_id() != group_id or event.get_sender_id() != send_id:
                     return
-
-                if image := await self.get_image(event):
+                image = await self._get_image(event)
+                if image and gallery:
                     controller.keep(timeout=30, reset_timeout=True)
                     result = gallery.add_image(image_bytes=image, image_label=label)
                     await event.send(event.plain_result(result))
@@ -325,7 +363,7 @@ class GalleryPlugin(Star):
                 controller.stop()
 
             try:
-                await empty_mention_waiter(event)  # type: ignore
+                await empty_mention_waiter(event)
             except TimeoutError as _:
                 yield event.plain_result("等待超时！")
             except Exception as e:
@@ -334,14 +372,16 @@ class GalleryPlugin(Star):
             event.stop_event()
 
     @filter.command("删图")
-    async def delete_image(
-        self, event: AstrMessageEvent, gallery_name: str | None = None
-    ):
+    async def delete_image(self, event: AstrMessageEvent):
         """
         删图 图库名 序号/all (多个序号用空格隔开)
         """
-        gallery_label = self.get_label(event, gallery_name)
-        gallery = self.get_gallary(event, gallery_label)
+        args = event.message_str.removeprefix("删图").strip().split(" ")
+        gallery_name = args[0] if args and not args[0].isdigit() else None
+        indexs = [int(arg) for arg in args if arg.isdigit()]
+
+        gallery_label = self._get_label(event, gallery_name)
+        gallery = self._get_gallary(event, gallery_label)
         if not gallery:
             yield event.plain_result("未找到对应图库")
             return
@@ -351,19 +391,14 @@ class GalleryPlugin(Star):
                 yield event.plain_result("你无权访问此图库")
                 return
 
-        args = event.message_str.removeprefix("删图").strip().split(" ")
-
         # 删除图片
-        if len(args) > 1 and args[1].isdigit():
-            indexs = [int(arg) for arg in args if arg.isdigit()]
-            if not indexs:
-                yield event.plain_result("未指定图片序号")
-                return
-            result = "".join(gallery.delete_image_by_index(index) for index in indexs)
-            yield event.plain_result(result)
+        if indexs:
+            for index in indexs:
+                result = "".join(gallery.delete_image_by_index(index))
+                yield event.plain_result(result)
 
         # 删除图库
-        elif len(args) > 1 and args[1] == "all":
+        else:
             is_deleted = await self.gm.delete_gallery(gallery_label)
             if is_deleted:
                 yield event.plain_result(f"已删除图库【{gallery_label}】")
@@ -371,14 +406,16 @@ class GalleryPlugin(Star):
                 yield event.plain_result("删除失败")
 
     @filter.command("查看")
-    async def view_image(
-        self, event: AstrMessageEvent, gallery_name: str | None = None
-    ):
+    async def view_image(self, event: AstrMessageEvent):
         """
         查看 序号/图库名
         """
-        gallery_label = self.get_label(event, gallery_name)
-        gallery = self.get_gallary(event, gallery_label)
+        args = event.message_str.removeprefix("查看").strip().split(" ")
+        gallery_name = args[0] if args and not args[0].isdigit() else None
+        indexs = [int(arg) for arg in args if arg.isdigit()]
+
+        gallery_label = self._get_label(event, gallery_name)
+        gallery = self._get_gallary(event, gallery_label)
         if not gallery:
             yield event.plain_result("未找到对应图库")
             return
@@ -387,12 +424,8 @@ class GalleryPlugin(Star):
             if not event.is_admin() and event.get_sender_id() != gallery.password:
                 yield event.plain_result("你无权访问此图库")
                 return
-
-        args = event.message_str.removeprefix("查看").strip().split(" ")
-
         # 查看图片
-        if len(args) > 1 and args[1].isdigit():
-            indexs = [int(arg) for arg in args if arg.isdigit()]
+        if indexs:
             for index in indexs:
                 result = gallery.view_by_index(index)
                 if isinstance(result, str):
@@ -401,7 +434,7 @@ class GalleryPlugin(Star):
                 yield event.image_result(str(result))
 
         # 查看图库
-        elif len(args) == 1:
+        else:
             result = gallery.preview()
             if isinstance(result, str):
                 yield event.plain_result(result)
@@ -426,8 +459,8 @@ class GalleryPlugin(Star):
         self, event: AstrMessageEvent, gallery_name: str | None = None
     ):
         """查看图库的详细信息"""
-        gallery_label = self.get_label(event, gallery_name)
-        gallery = self.get_gallary(event, gallery_label)
+        gallery_label = self._get_label(event, gallery_name)
+        gallery = self._get_gallary(event, gallery_label)
         if not gallery:
             yield event.plain_result(f"未找到图库【{gallery_label}】")
             return
@@ -449,12 +482,12 @@ class GalleryPlugin(Star):
     @filter.command("路径")
     async def find_path(self, event: AstrMessageEvent, gallery_name: str | None = None):
         """查看图库路径"""
-        gallery_label = self.get_label(event, gallery_name)
-        gallery = self.get_gallary(event, gallery_label)
+        gallery_label = self._get_label(event, gallery_name)
+        gallery = self._get_gallary(event, gallery_label)
         if not gallery:
             yield event.plain_result(f"未找到图库【{gallery_label}】")
             return
-        image = await self.get_image(event)
+        image = await self._get_image(event)
         if not image:
             yield event.plain_result("未指定要查找的图片")
             return
@@ -464,7 +497,7 @@ class GalleryPlugin(Star):
     @filter.command("解析")
     async def parse(self, event: AstrMessageEvent):
         """解析图片的信息"""
-        image = await self.get_image(event)
+        image = await self._get_image(event)
         if not image:
             yield event.plain_result("未指定要解析的图片")
             return
@@ -486,7 +519,7 @@ class GalleryPlugin(Star):
         except Exception as e:
             logger.error(f"图片下载失败: {e}")
 
-    def get_label(self, event: AstrMessageEvent, label=None) -> str:
+    def _get_label(self, event: AstrMessageEvent, label=None) -> str:
         """获取标签"""
         if not label:
             for arg in event.message_str.split(" "):
@@ -503,7 +536,7 @@ class GalleryPlugin(Star):
 
         return label_str or event.get_sender_id()
 
-    async def get_image(self, event: AstrMessageEvent) -> bytes | None:
+    async def _get_image(self, event: AstrMessageEvent) -> bytes | None:
         """获取图片"""
         chain = event.get_messages()
         # 遍历引用消息
@@ -521,16 +554,16 @@ class GalleryPlugin(Star):
                     if msg_image := await self.download_image(img_url):
                         return msg_image
 
-    def get_gallary(
+    def _get_gallary(
         self, event: AstrMessageEvent, gallery_name: str | None
     ) -> Gallery | None:
         """获取目标图库"""
-        label = self.get_label(event)
+        label = self._get_label(event)
         gallery_name = gallery_name or label or "Unknown"
         gallery = self.gm.get_gallery(gallery_name)
         return gallery
 
-    def get_at_id(self, event: AstrMessageEvent) -> str|None:
+    def _get_at_id(self, event: AstrMessageEvent) -> str | None:
         """获取At者的ID"""
         return next(
             (
@@ -544,24 +577,27 @@ class GalleryPlugin(Star):
     @filter.command("图库帮助")
     async def gallery_help(self, event: AstrMessageEvent):
         """查看图库帮助"""
+        prefix = self.wake_prefix[0] if self.wake_prefix else ""
         help_text = (
-            "【图库帮助】(前缀以bot设置的为准)\n\n"
-            "/精准匹配词 - 查看精准匹配词\n\n"
-            "/模糊匹配词 - 查看模糊匹配词\n\n"
-            "/模糊匹配 <图库名> - 将指定图库切换到模糊匹配模式\n\n"
-            "/精准匹配 <图库名> - 将指定图库切换到精准匹配模式\n\n"
-            "/添加匹配词 <图库名> <匹配词> - 为指定图库添加匹配词\n\n"
-            "/删除匹配词 <图库名> <匹配词> - 为指定图库删除匹配词\n\n"
-            "/设置容量 <图库名> <容量> - 设置指定图库的容量上限\n\n"
-            "/设置压缩 <图库名> - 设置指定图库的图片压缩开关\n\n"
-            "/设置去重 <图库名> - 设置指定图库的图片去重开关\n\n"
-            "/存图 <图库名> <序号> - 存图到指定图库，序号指定时会替换掉原图，图库名不填则默认自己昵称\n\n"
-            "/删图 <图库名> <序号/all> - 删除指定图库中的图片，多个序号用空格隔开，all表示删除整个图库\n\n"
-            "/查看 <序号/图库名> - 查看指定图库中的图片或图库详情，序号指定时查看单张图片\n\n"
-            "/图库列表 - 查看所有图库\n\n"
-            "/图库详情 <图库名> - 查看指定图库的详细信息\n\n"
-            "(引用图片)/路径 <图库名> - 查看指定图库的路径\n\n"
-            "(引用图片)/解析 - 解析图片的信息"
+            "【图库帮助】(标有s表示可输入多个,空格隔开参数,图库名皆可用@某人代替)\n\n"
+            f"{prefix}精准匹配词 - 查看精准匹配词\n\n"
+            f"{prefix}模糊匹配词 - 查看模糊匹配词\n\n"
+            f"{prefix}模糊匹配 <图库名s> - 将指定图库切换到模糊匹配模式\n\n"
+            f"{prefix}精准匹配 <图库名s> - 将指定图库切换到精准匹配模式\n\n"
+            f"{prefix}添加匹配词 <图库名> <匹配词s> - 为指定图库添加匹配词\n\n"
+            f"{prefix}删除匹配词 <图库名> <匹配词s> - 为指定图库删除匹配词\n\n"
+            f"{prefix}设置容量 <图库名> <容量> - 设置指定图库的容量上限\n\n"
+            f"{prefix}开启压缩 <图库名s> 打开指定图库的压缩开关\n\n"
+            f"{prefix}关闭压缩 <图库名s> 关闭指定图库的压缩开关\n\n"
+            f"{prefix}开启去重 <图库名s> 打开指定图库的去重开关\n\n"
+            f"{prefix}关闭去重 <图库名s> 关闭指定图库的去重开关\n\n"
+            f"{prefix}存图 <图库名> <序号> - 存图到指定图库，序号指定时会替换掉原图，图库名不填则默认自己昵称，可也@他人作为图库名\n\n"
+            f"{prefix}删图 <图库名> <序号s> - 删除指定图库中的图片，序号不指定表示删除整个图库\n\n"
+            f"{prefix}查看 <序号s/图库名> - 查看指定图库中的图片或图库详情，序号指定时查看单张图片\n\n"
+            f"{prefix}图库列表 - 查看所有图库\n\n"
+            f"{prefix}图库详情 <图库名> - 查看指定图库的详细信息\n\n"
+            f"{prefix}(引用图片)/路径 <图库名> - 查看指定图片的路径，需指定在哪个图库查找\n\n"
+            f"{prefix}(引用图片)/解析 - 解析图片的信息"
         )
         url = await self.text_to_image(help_text)
         yield event.image_result(url)
