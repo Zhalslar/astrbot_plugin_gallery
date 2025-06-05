@@ -13,7 +13,7 @@ class GalleryManager:
     内部维护一个图库列表，用json文件存储图库信息
     """
 
-    def __init__(self, galleries_dir: Path, json_file_path: Path):
+    def __init__(self, galleries_dir: Path, json_file_path: Path, default_gallery_info):
         """
         初始化图库管理器
         :param json_file_path: 存储图库信息的JSON文件路径
@@ -23,6 +23,7 @@ class GalleryManager:
         self.galleries_dir: Path = galleries_dir
         self.galleries_dir.mkdir(parents=True, exist_ok=True)
         self.galleries = {}
+        self.default_gallery_info = default_gallery_info
 
     async def initialize(self):
         """
@@ -92,16 +93,8 @@ class GalleryManager:
 
         # 添加新增的文件夹为图库实例
         for folder_name in actual_folder_names - current_gallery_names:
-            gallery_info = {
-                "name": folder_name,
-                "creator_id": "Unknown",
-                "creator_name": "Unknown",
-                "password": 0,
-                "max_capacity": 200,
-                "compress_switch": True,
-                "duplicate_switch": True,
-                "fuzzy_match": False,
-            }
+            gallery_info = self.default_gallery_info.copy()
+            gallery_info["name"] = folder_name
             await self.add_gallery(gallery_info)
             logger.info(f"已加载新图库文件夹为实例：{folder_name}")
 

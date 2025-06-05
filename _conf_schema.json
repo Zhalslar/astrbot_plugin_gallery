@@ -62,14 +62,14 @@
         }
     },
     "add_default_config": {
-        "description": "存图时默认的参数配置",
+        "description": "新建图库时的默认参数",
         "type": "object",
         "hint": "",
         "items": {
             "default_compress_switch": {
-                "description": "存图时压缩图片",
+                "description": "新建图库时自动打开压缩开关",
                 "type": "bool",
-                "hint": "不超过此长度时不响应",
+                "hint": "往新图库存图时，若图片尺寸大于压缩阈值则压缩图片",
                 "default": true
             },
             "compress_size": {
@@ -79,27 +79,27 @@
                 "default": 512
             },
             "default_duplicate_switch": {
-                "description": "存图时自动去重",
+                "description": "新建图库时自动打开去重开关",
                 "type": "bool",
-                "hint": "",
+                "hint": "往新图库存图时，若存在重复图片则终止操作",
                 "default": true
             },
             "default_fuzzy_match": {
-                "description": "自动设置为模糊匹配",
+                "description": "新建图库时自动设置为模糊匹配",
                 "type": "bool",
                 "hint": "",
                 "default": false
             },
             "label_max_length": {
-                "description": "图库名最大长度",
+                "description": "新建图库名最大长度",
                 "type": "int",
-                "hint": "单位为字符",
+                "hint": "单位为字符，超过此长度会被截断",
                 "default": 10
             },
             "max_pic_count": {
                 "description": "图库的默认容量上限",
                 "type": "int",
-                "hint": "图库中的图片数量不能超过此值",
+                "hint": "图库中的图片数量达到此数量时，图库将无法添加图片",
                 "default": 200
             }
         }

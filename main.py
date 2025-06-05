@@ -31,7 +31,7 @@ GALLERIES_INFO_FILE = Path("data/plugins_data") / "astrbot_plugin_gallery_info.j
     "astrbot_plugin_gallery",
     "Zhalslar",
     "本地图库管理器",
-    "1.0.6",
+    "1.0.7",
     "https://github.com/Zhalslar/astrbot_plugin_gallery",
 )
 class GalleryPlugin(Star):
@@ -62,7 +62,7 @@ class GalleryPlugin(Star):
         self.llm_fuzzy_prob: float = llm_config.get("llm_fuzzy_prob", 0.9)
 
         add_default_config = config.get("add_default_config", {})
-        # 下载图片时是否压缩图片，默认开启
+        # 下载图片时是否压缩图片
         self.default_compress_switch: bool = add_default_config.get(
             "default_compress_switch", True
         )
@@ -81,6 +81,17 @@ class GalleryPlugin(Star):
         # 图库的默认容量
         self.max_pic_count: int = add_default_config.get("max_pic_count", 200)
 
+        self.default_gallery_info = {
+            "name": "Unknown",
+            "creator_id": "Unknown",
+            "creator_name": "Unknown",
+            "password": 0,
+            "max_capacity": self.max_pic_count,
+            "compress_switch": self.default_compress_switch,
+            "duplicate_switch": self.default_duplicate_switch,
+            "fuzzy_match": self.default_fuzzy_match,
+        }
+
         perm_config = config.get("perm_config", {})
         # 是否允许非管理员向任意图库添加图片
         self.allow_add: bool = perm_config.get("allow_add", False)
@@ -90,7 +101,9 @@ class GalleryPlugin(Star):
         self.allow_view: bool = perm_config.get("allow_view", True)
 
         # 初始化总图库文件夹
-        self.gm = GalleryManager(GALLERIES_DIR, GALLERIES_INFO_FILE)
+        self.gm = GalleryManager(
+            GALLERIES_DIR, GALLERIES_INFO_FILE, self.default_gallery_info
+        )
         asyncio.create_task(self.gm.initialize())
 
     @filter.event_message_type(EventMessageType.ALL)
