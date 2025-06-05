@@ -14,7 +14,7 @@
                 "description": "用户消息最大长度限制",
                 "type": "int",
                 "hint": "超过此长度时不进行图库匹配",
-                "default": 20
+                "default": 30
             },
             "user_exact_prob": {
                 "description": "精准匹配时发图概率",
@@ -26,7 +26,7 @@
                 "description": "模糊匹配时发图概率",
                 "type": "float",
                 "hint": "",
-                "default": 0.9
+                "default": 0.5
             }
         }
     },
@@ -45,7 +45,7 @@
                 "description": "LLM消息最大长度限制",
                 "type": "int",
                 "hint": "超过此长度时不进行图库匹配",
-                "default": 20
+                "default": 50
             },
             "llm_exact_prob": {
                 "description": "精准匹配LLM消息时的发图概率",
@@ -57,7 +57,7 @@
                 "description": "模糊匹配LLM消息时的发图概率",
                 "type": "float",
                 "hint": "",
-                "default": 0.9
+                "default": 0.5
             }
         }
     },
