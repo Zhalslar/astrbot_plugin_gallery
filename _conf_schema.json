@@ -67,7 +67,7 @@
         "hint": "",
         "items": {
             "default_compress_switch": {
-                "description": "存图时是否默认压缩图片",
+                "description": "存图时压缩图片",
                 "type": "bool",
                 "hint": "不超过此长度时不响应",
                 "default": true
@@ -79,13 +79,13 @@
                 "default": 512
             },
             "default_duplicate_switch": {
-                "description": "是否允许图库中图片重复",
+                "description": "存图时自动去重",
                 "type": "bool",
                 "hint": "",
                 "default": false
             },
             "default_fuzzy_match": {
-                "description": "是否默认模糊匹配",
+                "description": "自动设置为模糊匹配",
                 "type": "bool",
                 "hint": "",
                 "default": false
