@@ -220,12 +220,8 @@ class GalleryPlugin(Star):
             yield event.plain_result(result)
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("添加匹配词")
-    async def add_ketord(
-        self,
-        event: AstrMessageEvent,
-        gallery_name: str | None = None,
-        keyword: str | None = None,
-    ):
+    async def add_ketord(self,event: AstrMessageEvent,):
+        """添加匹配词到指定图库"""
         args = event.message_str.removeprefix("添加匹配词").strip().split(" ")
         gallery_name = args[0] if args and not args[0].isdigit() else None
         keywords = args[1:]
@@ -235,7 +231,7 @@ class GalleryPlugin(Star):
         if not gallery:
             yield event.plain_result(f"未找到图库【{gallery_label}】")
             return
-        if not keyword:
+        if not keywords:
             yield event.plain_result("未指定匹配词")
             return
         result = []
@@ -246,23 +242,22 @@ class GalleryPlugin(Star):
         yield event.plain_result("\n".join(result))
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("删除匹配词")
-    async def delete_keyword(
-        self,
-        event: AstrMessageEvent,
-        gallery_name: str | None = None,
-        keyword: str | None = None,
-    ):
+    async def delete_keyword(self,event: AstrMessageEvent):
+        """删除指定图库的匹配词"""
         args = event.message_str.removeprefix("删除匹配词").strip().split(" ")
         gallery_name = args[0] if args and not args[0].isdigit() else None
         keywords = args[1:]
+
         gallery_label = await self._get_label(event, gallery_name)
         gallery = await self._get_gallary(event, gallery_label)
         if not gallery:
             yield event.plain_result(f"未找到图库【{gallery_label}】")
             return
-        if not keyword:
+
+        if not keywords:
             yield event.plain_result("未指定匹配词")
             return
+
         result = []
         for keyword in set(keywords) - set(gallery.keywords):
             result.append(
