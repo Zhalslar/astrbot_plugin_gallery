@@ -31,7 +31,7 @@ GALLERIES_INFO_FILE = Path("data/plugins_data") / "astrbot_plugin_gallery_info.j
     "astrbot_plugin_gallery",
     "Zhalslar",
     "本地图库管理器",
-    "1.0.8",
+    "1.0.9",
     "https://github.com/Zhalslar/astrbot_plugin_gallery",
 )
 class GalleryPlugin(Star):
@@ -523,14 +523,15 @@ class GalleryPlugin(Star):
             f"图库名称：{gallery.name}\n"
             f"图库路径：{gallery.path}\n"
             f"创建者ID：{gallery.creator_id}\n"
-            f"创建者名称：{gallery.creator_name}\n"
+            f"创建者：{gallery.creator_name}\n"
             f"创建时间：{gallery.creation_time}\n"
+            f"密码：{gallery.password}\n"
             f"容量上限：{gallery.max_capacity}\n"
             f"已用容量：{len(os.listdir(gallery.path))}\n"
-            f"是否压缩图片：{gallery.compress_switch}\n"
-            f"是否允许重复：{gallery.duplicate_switch}\n"
-            f"是否模糊匹配：{gallery.fuzzy_match}\n"
-            f"图库匹配词：{gallery.keywords}"
+            f"压缩图片：{gallery.compress_switch}\n"
+            f"图片去重：{gallery.duplicate_switch}\n"
+            f"模糊匹配：{gallery.fuzzy_match}\n"
+            f"匹配词：{gallery.keywords}"
         )
         yield event.plain_result(details)
 
