@@ -184,19 +184,19 @@ class GalleryPlugin(Star):
                     image_path = gallery.get_random_image()
                     logger.info(f"匹配到图片：{image_path}")
         return image_path
-
+    @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("精准匹配词")
     async def list_accurate_keywords(self, event: AstrMessageEvent):
         """查看精准匹配词"""
         reply = f"【精准匹配词】：\n{str(self.gm.get_exact_match_keywords())}"
         yield event.plain_result(reply)
-
+    @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("模糊匹配词")
     async def list_fuzzy_keywords(self, event: AstrMessageEvent):
         """ "查看模糊匹配词"""
         reply = f"【模糊匹配词】：\n{str(self.gm.get_fuzzy_match_keywords())}"
         yield event.plain_result(reply)
-
+    @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("模糊匹配")
     async def fuzzy_match(self, event: AstrMessageEvent):
         """将图库切换到模糊匹配模式"""
@@ -208,7 +208,7 @@ class GalleryPlugin(Star):
                 return
             result = await self.gm.set_fuzzy_match(gallery_name=name, fuzzy_match=True)
             yield event.plain_result(result)
-
+    @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("精准匹配")
     async def accurate_match(self, event: AstrMessageEvent):
         """将图库切换到精准匹配模式"""
@@ -220,7 +220,7 @@ class GalleryPlugin(Star):
                 return
             result = await self.gm.set_fuzzy_match(gallery_name=name, fuzzy_match=False)
             yield event.plain_result(result)
-
+    @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("添加匹配词")
     async def add_ketord(
         self,
@@ -238,7 +238,7 @@ class GalleryPlugin(Star):
             return
         result = await self.gm.add_keyword(gallery_name=gallery_label, keyword=keyword)
         yield event.plain_result(result)
-
+    @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("删除匹配词")
     async def delete_keyword(
         self,
@@ -256,7 +256,7 @@ class GalleryPlugin(Star):
             return
         result = await self.gm.add_keyword(gallery_name=gallery_label, keyword=keyword)
         yield event.plain_result(result)
-
+    @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("设置容量")
     async def set_max_capacity(
         self,
@@ -276,7 +276,7 @@ class GalleryPlugin(Star):
             gallery_name=gallery_label, max_capacity=max_capacity
         )
         yield event.plain_result(result)
-
+    @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("设置密码")
     async def set_password(
         self,
@@ -296,7 +296,7 @@ class GalleryPlugin(Star):
             gallery_name=gallery_label, password=str(password)
         )
         yield event.plain_result(result)
-
+    @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("开启压缩")
     async def open_compress_switch(self, event: AstrMessageEvent):
         """打开图库的压缩开关"""
@@ -306,7 +306,7 @@ class GalleryPlugin(Star):
 
         async for r in self._toggle_gallery_switch(event, "开启压缩", do_switch):
             yield r
-
+    @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("关闭压缩")
     async def close_compress_switch(self, event: AstrMessageEvent):
         """关闭图库的压缩开关"""
@@ -316,7 +316,7 @@ class GalleryPlugin(Star):
 
         async for r in self._toggle_gallery_switch(event, "关闭压缩", do_switch):
             yield r
-
+    @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("开启去重")
     async def open_duplicate_switch(self, event: AstrMessageEvent):
         """打开图库的去重开关"""
@@ -326,7 +326,7 @@ class GalleryPlugin(Star):
 
         async for r in self._toggle_gallery_switch(event, "开启去重", do_switch):
             yield r
-
+    @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("关闭去重")
     async def close_duplicate_switch(self, event: AstrMessageEvent):
         """关闭图库的去重开关"""
@@ -516,7 +516,7 @@ class GalleryPlugin(Star):
                 return
             chain = [Comp.Image.fromBytes(result)]
             yield event.chain_result(chain)  # type: ignore
-
+    @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("图库列表")
     async def view_all(self, event: AstrMessageEvent):
         """查看所有图库"""
@@ -528,7 +528,7 @@ class GalleryPlugin(Star):
         yield event.plain_result(
             f"------共{len(galleries)}个图库------\n{'、'.join(names)}"
         )
-
+    @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("图库详情")
     async def gallery_details(
         self, event: AstrMessageEvent, gallery_name: str | None = None
