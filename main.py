@@ -277,6 +277,26 @@ class GalleryPlugin(Star):
         )
         yield event.plain_result(result)
 
+    @filter.command("设置密码")
+    async def set_password(
+        self,
+        event: AstrMessageEvent,
+        gallery_name: str | None = None,
+        password: str | int | None = None,
+    ):
+        gallery_label = await self._get_label(event, gallery_name)
+        gallery = await self._get_gallary(event, gallery_label)
+        if not gallery:
+            yield event.plain_result(f"未找到图库【{gallery_label}】")
+            return
+        if not password:
+            yield event.plain_result("未指定新密码")
+            return
+        result = await self.gm.set_password(
+            gallery_name=gallery_label, password=str(password)
+        )
+        yield event.plain_result(result)
+
     @filter.command("开启压缩")
     async def open_compress_switch(self, event: AstrMessageEvent):
         """打开图库的压缩开关"""
@@ -525,7 +545,7 @@ class GalleryPlugin(Star):
             f"创建者ID：{gallery.creator_id}\n"
             f"创建者：{gallery.creator_name}\n"
             f"创建时间：{gallery.creation_time}\n"
-            f"密码：{gallery.password}\n"
+            f"访问密码：{gallery.password}\n"
             f"容量上限：{gallery.max_capacity}\n"
             f"已用容量：{len(os.listdir(gallery.path))}\n"
             f"压缩图片：{gallery.compress_switch}\n"
@@ -667,6 +687,7 @@ class GalleryPlugin(Star):
             f"{prefix}添加匹配词 <图库名> <匹配词s> - 为指定图库添加匹配词\n\n"
             f"{prefix}删除匹配词 <图库名> <匹配词s> - 为指定图库删除匹配词\n\n"
             f"{prefix}设置容量 <图库名> <容量> - 设置指定图库的容量上限\n\n"
+            f"{prefix}设置密码 <图库名> <密码> - 设置指定图库的密码\n\n"
             f"{prefix}开启压缩 <图库名s> 打开指定图库的压缩开关\n\n"
             f"{prefix}关闭压缩 <图库名s> 关闭指定图库的压缩开关\n\n"
             f"{prefix}开启去重 <图库名s> 打开指定图库的去重开关\n\n"

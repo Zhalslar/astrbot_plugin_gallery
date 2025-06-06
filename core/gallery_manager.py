@@ -175,7 +175,7 @@ class GalleryManager:
             gallery.password = password
             logger.info(f"图库访问密码：{password}")
             await self.save_galleries()
-            return f"图库【{gallery_name}】密码已设置"
+            return f"图库【{gallery_name}】密码已设置为：{password}"
         return f"图库【{gallery_name}】不存在"
 
     async def set_fuzzy_match(self, gallery_name: str, fuzzy_match: bool):
@@ -183,7 +183,7 @@ class GalleryManager:
         if gallery := self.get_gallery(gallery_name):
             gallery.fuzzy_match = fuzzy_match
             await self.save_galleries()
-            return f"图库【{gallery_name}】模糊匹配已设置"
+            return f"图库【{gallery_name}】模糊匹配：{fuzzy_match}"
         return f"图库【{gallery_name}】不存在"
 
     async def set_max_capacity(self, gallery_name: str, max_capacity: int):
@@ -192,7 +192,7 @@ class GalleryManager:
             if max_capacity > 0:
                 gallery.max_capacity = max_capacity
                 await self.save_galleries()
-                return f"图库容量上限已设置为：{max_capacity}"
+                return f"图库【{gallery_name}】容量上限已设置为：{max_capacity}"
             else:
                 return f"图库容量上限错误：{max_capacity}，必须大于0"
         return f"图库【{gallery_name}】不存在"
@@ -230,7 +230,7 @@ class GalleryManager:
             if keyword in gallery.keywords:
                 gallery.keywords.remove(keyword)
                 await self.save_galleries()
-                return f"已删除图库【{gallery_name}】的匹配词“{keyword}”"
+                return f"已删除图库【{gallery_name}】的匹配词：{keyword}"
             else:
                 return f"图库【{gallery_name}】不存在匹配词“{keyword}”"
         return f"图库【{gallery_name}】不存在"
