@@ -24,6 +24,8 @@ class GalleryManager:
         self.galleries_dir.mkdir(parents=True, exist_ok=True)
         self.galleries = {}
         self.default_gallery_info = default_gallery_info
+        self.exact_keywords = []
+        self.fuzzy_keywords = []
 
     async def initialize(self):
         """
@@ -36,6 +38,8 @@ class GalleryManager:
         logger.info("图库实例化完成")
         await self._sync_with_filesystem()
         logger.info("图库与文件系统同步完成")
+        await self._update_keywords()
+        logger.info("匹配词更新完成")
 
     async def _init_json_file(self):
         """
@@ -105,6 +109,20 @@ class GalleryManager:
 
         await self.save_galleries()
 
+    async def _update_keywords(self):
+        """更新匹配词"""
+        exact_keywords = []
+        fuzzy_keywords = []
+
+        for gallery in self.galleries.values():
+            if gallery.fuzzy_match:
+                fuzzy_keywords.extend(gallery.keywords)
+            else:
+                exact_keywords.extend(gallery.keywords)
+
+        self.exact_keywords = exact_keywords
+        self.fuzzy_keywords = fuzzy_keywords
+
     def is_image_file(self, file: Path):
         """
         判断文件是否为图片
@@ -122,6 +140,7 @@ class GalleryManager:
         """
         将当前管理的图库信息保存到JSON文件
         """
+        await self._update_keywords()
         galleries_data = [gallery.to_dict() for gallery in self.galleries.values()]
         async with aiofiles.open(self.json_file_path, "w", encoding="utf-8") as file:
             await file.write(json.dumps(galleries_data, indent=4, ensure_ascii=False))
@@ -246,28 +265,15 @@ class GalleryManager:
             for gallery in self.galleries.values()
             if all(getattr(gallery, key) == value for key, value in filters.items())
         ]
-
-    def get_fuzzy_match_keywords(self) -> list[str]:
+    def get_gallery_by_keyword(self, keyword) -> list[Gallery]:
         """
-        获取所有模糊匹配的图库的关键词，组合成列表
-        :return: 关键词列表
+        根据给定的匹配词获取图库实例列表
+        :param keyword: 匹配词
+        :return: 满足条件的图库实例列表
         """
-        keywords = []
-        for gallery in self.galleries.values():
-            if gallery.fuzzy_match:
-                keywords.extend(gallery.keywords)
-        return keywords
-
-    def get_exact_match_keywords(self) -> list[str]:
-        """
-        获取所有精准匹配的图库的关键词，组合成列表
-        :return: 关键词列表
-        """
-        keywords = []
-        for gallery in self.galleries.values():
-            if not gallery.fuzzy_match:
-                keywords.extend(gallery.keywords)
-        return keywords
+        return [
+            gallery for gallery in self.galleries.values() if keyword in gallery.keywords
+        ]
 
     def get_all_galleries_names(self) -> list[str]:
         """
