@@ -228,6 +228,10 @@ class GalleryPlugin(Star):
         gallery_name: str | None = None,
         keyword: str | None = None,
     ):
+        args = event.message_str.removeprefix("添加匹配词").strip().split(" ")
+        gallery_name = args[0] if args and not args[0].isdigit() else None
+        keywords = args[1:]
+
         gallery_label = await self._get_label(event, gallery_name)
         gallery = await self._get_gallary(event, gallery_label)
         if not gallery:
@@ -236,8 +240,12 @@ class GalleryPlugin(Star):
         if not keyword:
             yield event.plain_result("未指定匹配词")
             return
-        result = await self.gm.add_keyword(gallery_name=gallery_label, keyword=keyword)
-        yield event.plain_result(result)
+        result = []
+        for keyword in set(keywords) - set(gallery.keywords):
+            result.append(
+                await self.gm.add_keyword(gallery_name=gallery_label, keyword=keyword)
+            )
+        yield event.plain_result("\n".join(result))
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("删除匹配词")
     async def delete_keyword(
@@ -246,6 +254,9 @@ class GalleryPlugin(Star):
         gallery_name: str | None = None,
         keyword: str | None = None,
     ):
+        args = event.message_str.removeprefix("添加匹配词").strip().split(" ")
+        gallery_name = args[0] if args and not args[0].isdigit() else None
+        keywords = args[1:]
         gallery_label = await self._get_label(event, gallery_name)
         gallery = await self._get_gallary(event, gallery_label)
         if not gallery:
@@ -254,16 +265,20 @@ class GalleryPlugin(Star):
         if not keyword:
             yield event.plain_result("未指定匹配词")
             return
-        result = await self.gm.add_keyword(gallery_name=gallery_label, keyword=keyword)
-        yield event.plain_result(result)
+        result = []
+        for keyword in set(keywords) - set(gallery.keywords):
+            result.append(
+                await self.gm.delete_keyword(gallery_name=gallery_label, keyword=keyword)
+            )
+        yield event.plain_result("\n".join(result))
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("设置容量")
-    async def set_max_capacity(
-        self,
-        event: AstrMessageEvent,
-        gallery_name: str | None = None,
-        max_capacity: int = 0,
-    ):
+    async def set_max_capacity(self, event: AstrMessageEvent):
+        """设置指定图库的最大容量"""
+        args = event.message_str.removeprefix("设置密码").strip().split(" ")
+        gallery_name = args[0] if args and not args[0].isdigit() else None
+        max_capacity = int(args[-1]) if args and args[-1].isdigit() else 0
+
         gallery_label = await self._get_label(event, gallery_name)
         gallery = await self._get_gallary(event, gallery_label)
         if not gallery:
@@ -278,12 +293,12 @@ class GalleryPlugin(Star):
         yield event.plain_result(result)
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("设置密码")
-    async def set_password(
-        self,
-        event: AstrMessageEvent,
-        gallery_name: str | None = None,
-        password: str | int | None = None,
-    ):
+    async def set_password(self, event: AstrMessageEvent):
+        """设置指定图库的密码"""
+        args = event.message_str.removeprefix("设置密码").strip().split(" ")
+        gallery_name = args[0] if args and not args[0].isdigit() else None
+        password = int(args[-1]) if args and args[-1].isdigit() else 0
+
         gallery_label = await self._get_label(event, gallery_name)
         gallery = await self._get_gallary(event, gallery_label)
         if not gallery:
