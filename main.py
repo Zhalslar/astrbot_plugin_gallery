@@ -31,7 +31,7 @@ GALLERIES_INFO_FILE = Path("data/plugins_data") / "astrbot_plugin_gallery_info.j
     "astrbot_plugin_gallery",
     "Zhalslar",
     "本地图库管理器",
-    "1.0.9",
+    "1.1.0",
     "https://github.com/Zhalslar/astrbot_plugin_gallery",
 )
 class GalleryPlugin(Star):
@@ -106,7 +106,9 @@ class GalleryPlugin(Star):
         # 自动收集的群聊白名单, 留空表示启用所有群聊
         self.white_list: list[str] = auto_collect_config.get("white_list", [])
         # 收集的图片大小限制(MB)
-        self.max_size: int = auto_collect_config.get("max_size", 6)
+        self.collect_compressed_img: int = auto_collect_config.get(
+            "collect_compressed_img", False
+        )
 
         # 初始化总图库文件夹
         self.gm = GalleryManager(
@@ -129,8 +131,7 @@ class GalleryPlugin(Star):
                     event, name=gallery_label, password=event.get_sender_id()
                 )
                 if image := await self._get_image(event, reply=False):
-                    # 检查图片大小
-                    if len(image) > self.max_size * 1024 * 1024:
+                    if not self.collect_compressed_img and gallery.need_compress(image):
                         return
                     result = gallery.add_image(image_bytes=image, image_label=gallery_label)
                     logger.info(f"自动收集图片：{result}")

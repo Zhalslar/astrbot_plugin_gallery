@@ -173,7 +173,7 @@ class Gallery:
         if len(list(self.path.iterdir())) >= self.max_capacity:
             return f"图库【{self.name}】容量已满"
 
-        if self.compress_switch:
+        if self.need_compress(image_bytes):
             if result := self.compress_image(image_bytes):  # 压缩图片
                 image_bytes = result
 
@@ -261,18 +261,26 @@ class Gallery:
         else:
             return f"图库【{self.name}】不存在"
 
+    def need_compress(self, image_bytes: bytes, max_size: int = 512) -> bool:
+        """判断图片是否需要压缩"""
+        if self.compress_switch is False:
+            return False
+        img = Image.open(io.BytesIO(image_bytes))
+        if img.format == "GIF":
+            return False
+        if img.width > max_size or img.height > max_size:
+            return True
+        return False
+
     @staticmethod
     def compress_image(image_bytes: bytes, max_size: int = 512) -> bytes | None:
         """压缩图片到max_size大小，gif不处理"""
+        image = Image.open(io.BytesIO(image_bytes))
         try:
-            img = Image.open(io.BytesIO(image_bytes))
-            if img.format == "GIF":
-                return
-            if img.width > max_size or img.height > max_size:
-                img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+            image.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
 
             output = io.BytesIO()
-            img.save(output, format=img.format)
+            image.save(output, format=image.format)
             output.seek(0)
             return output.getvalue()
 
