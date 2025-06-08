@@ -1,4 +1,13 @@
 {
+    "galleries_dirs": {
+        "description": "图库总目录列表",
+        "type": "list",
+        "obvious_hint": true,
+        "hint": "每个目录下存储着图库的文件夹，第一条路径为默认的总目录，自定义的路径时请务必使用绝对路径(不要带双引号)",
+        "default": [
+            "data/plugins_data/astrbot_plugin_gallery"
+        ]
+    },
     "user_config": {
         "description": "用户消息触发",
         "type": "object",
@@ -17,13 +26,13 @@
                 "default": 30
             },
             "user_exact_prob": {
-                "description": "精准匹配时发图概率",
+                "description": "精准匹配用户消息时的发图概率",
                 "type": "float",
                 "hint": "",
                 "default": 0.9
             },
             "user_fuzzy_prob": {
-                "description": "模糊匹配时发图概率",
+                "description": "模糊匹配用户消息时的发图概率",
                 "type": "float",
                 "hint": "",
                 "default": 0.5
@@ -66,7 +75,7 @@
         "type": "object",
         "hint": "",
         "items": {
-            "default_compress_switch": {
+            "default_compress": {
                 "description": "新建图库时自动打开压缩开关",
                 "type": "bool",
                 "hint": "往新图库存图时，若图片尺寸大于压缩阈值则压缩图片",
@@ -78,13 +87,13 @@
                 "hint": "单位为像素，图片在512像素以下时qq以小图显示",
                 "default": 512
             },
-            "default_duplicate_switch": {
+            "default_duplicate": {
                 "description": "新建图库时自动打开去重开关",
                 "type": "bool",
                 "hint": "往新图库存图时，若存在重复图片则终止操作",
                 "default": true
             },
-            "default_fuzzy_match": {
+            "default_fuzzy": {
                 "description": "新建图库时自动设置为模糊匹配",
                 "type": "bool",
                 "hint": "",
@@ -93,13 +102,13 @@
             "label_max_length": {
                 "description": "新建图库名最大长度",
                 "type": "int",
-                "hint": "单位为字符，超过此长度会被截断",
+                "hint": "单位为字符，超过此长度会被截断(仅对公共图库生效)",
                 "default": 10
             },
-            "max_pic_count": {
+            "default_capacity": {
                 "description": "图库的默认容量上限",
                 "type": "int",
-                "hint": "图库中的图片数量达到此数量时，图库将无法添加图片",
+                "hint": "图库中的图片数量达到此数量时，图库将无法添加图片，为了区别QQ号与数值，设置的数值不要超过10000",
                 "default": 200
             }
         }
@@ -146,11 +155,11 @@
                 "hint": "不填表示启用所有群聊",
                 "default": []
             },
-            "max_size": {
-                "description": "收集的图片大小限制",
-                "type": "int",
-                "hint": "单位为MB, 超过此大小时不收集此图片",
-                "default": 6
+            "collect_compressed_img": {
+                "description": "图片达到压缩阈值时是否仍然收集",
+                "type": "bool",
+                "hint": "仅对开启了去重的图库有效，未开启去重的图库不受限",
+                "default": false
             }
         }
     }

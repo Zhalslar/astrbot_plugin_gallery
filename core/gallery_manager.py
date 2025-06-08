@@ -1,29 +1,29 @@
 import asyncio
 import json
-from pathlib import Path
-
+import os
+#from pathlib import Path
 import aiofiles
 from astrbot import logger
 from .gallery import Gallery
-
+from ..utils import unzip_file, zip_folder, move_files_up
 
 class GalleryManager:
     """
     图库管理器类，负责管理所有图库的创建、删除和操作
     内部维护一个图库列表，用json文件存储图库信息
     """
-
-    def __init__(self, galleries_dir: Path, json_file_path: Path, default_gallery_info):
+    def __init__(
+        self, galleries_dirs: list, json_file_path: str, default_gallery_info
+    ):
         """
         初始化图库管理器
         :param json_file_path: 存储图库信息的JSON文件路径
         :param galleries_dir: 图库的根目录路径
         """
-        self.json_file_path: Path = json_file_path
-        self.galleries_dir: Path = galleries_dir
-        self.galleries_dir.mkdir(parents=True, exist_ok=True)
+        self.json_file_path: str = json_file_path
+        self.galleries_dirs: list[str] = galleries_dirs
         self.galleries = {}
-        self.default_gallery_info = default_gallery_info
+        self.default_gallery_info = default_gallery_info.copy()
         self.exact_keywords = []
         self.fuzzy_keywords = []
 
@@ -31,15 +31,26 @@ class GalleryManager:
         """
         初始化图库管理器
         """
-        logger.info("开始初始化图库管理器")
+        logger.info("图库管理器插件初始化中...")
+        logger.debug(f"可用的图库总目录列表：{self.galleries_dirs}")
+
         await self._init_json_file()
-        logger.info("Json文件初始化完成")
+        logger.debug("Json文件初始化完成")
+
         await self._load_json()
-        logger.info("图库实例化完成")
-        await self._sync_with_filesystem()
-        logger.info("图库与文件系统同步完成")
+        logger.debug("从Json文件中加载实例完成")
+
+        await self._load_new_folder()
+        logger.debug("从新的文件夹中加载实例完成")
+
+        await self.load_zips()
+        logger.debug("从zip文件中加载实例完成")
+
         await self._update_keywords()
-        logger.info("匹配词更新完成")
+        logger.debug("匹配词更新完成")
+
+        logger.info("图库管理器插件初始化完成，欢迎使用━(*｀∀´*)ノ亻!")
+
 
     async def _init_json_file(self):
         """
@@ -47,7 +58,7 @@ class GalleryManager:
         如果文件不存在，则创建一个空的JSON文件。
         如果文件存在但内容为空或不是有效的JSON列表
         """
-        if not self.json_file_path.exists():
+        if not os.path.exists(self.json_file_path):
             async with aiofiles.open(
                 self.json_file_path, "w", encoding="utf-8"
             ) as file:
@@ -67,47 +78,76 @@ class GalleryManager:
     async def _load_json(self):
         """
         从JSON文件加载图库信息并创建图库实例
+        (实际文件夹存在的图库才会被加载，不存在则会被删除信息)
         """
-        if self.json_file_path.exists():
-            async with aiofiles.open(
-                self.json_file_path, "r", encoding="utf-8"
-            ) as file:
+        if not os.path.exists(self.json_file_path):
+            async with aiofiles.open(self.json_file_path, "r", encoding="utf-8") as file:
                 data = await file.read()
-            galleries_data = json.loads(data)
+            tasks = []
+            for gallery_info in json.loads(data):
+                if os.path.exists(gallery_info["path"]):
+                    tasks.append(self.load_gallery(gallery_info))
 
-            tasks = [
-                self._create_gallery_instance(gallery_info)
-                for gallery_info in galleries_data
-            ]
             await asyncio.gather(*tasks)
+            await self._save_galleries()
 
-    async def _sync_with_filesystem(self):
+    async def _load_new_folder(self):
         """
-        将实例与文件夹同步：
-        - 添加文件夹中有但实例中没有的图库
-        - 删除实例中有但文件夹不存在的图库
+        从新的文件夹中加载图库
         """
-        # 当前图库实例的名称集合
-        current_gallery_names = set(self.galleries.keys())
+        for galleries_dir in self.galleries_dirs:
+            for folder_name in os.listdir(galleries_dir):
+                folder_path = os.path.join(galleries_dir, folder_name)
+                # 确保是文件夹且未加载过的图库
+                if os.path.isdir(folder_path) and folder_name not in self.galleries:
+                    # 加载图库
+                    self.default_gallery_info["path"] = folder_path
+                    await self.load_gallery(self.default_gallery_info)
 
-        # 实际文件夹名称集合
-        actual_folder_names = {
-            folder.name for folder in self.galleries_dir.iterdir() if folder.is_dir()
-        }
+        await self._save_galleries()
 
-        # 添加新增的文件夹为图库实例
-        for folder_name in actual_folder_names - current_gallery_names:
-            gallery_info = self.default_gallery_info.copy()
-            gallery_info["name"] = folder_name
-            await self.add_gallery(gallery_info)
-            logger.info(f"已加载新图库文件夹为实例：{folder_name}")
+    async def load_zips(self):
+        """
+        解压总图库文件夹中的ZIP文件，并加载为图库实例
+        """
+        for galleries_dir in self.galleries_dirs:
+            for entry in os.scandir(galleries_dir):
+                if entry.is_file() and entry.name.lower().endswith(".zip"):
+                    zip_file = entry
+                    folder_name = zip_file.name.rsplit(".", 1)[
+                        0
+                    ]  # 去除扩展名，获取文件夹名称
+                    folder_path = os.path.join(galleries_dir, folder_name)
 
-        # 删除不存在文件夹的图库实例
-        for gallery_name in current_gallery_names - actual_folder_names:
-            await self.delete_gallery(gallery_name)
-            logger.warning(f"已删除失效图库实例：{gallery_name}")
+                    # 检查是否已存在同名文件夹
+                    if any(
+                        os.path.exists(os.path.join(galleries_dir, folder_name))
+                        for galleries_dir in self.galleries_dirs
+                    ):
+                        logger.warning(
+                            f"已存在同名文件夹【{folder_name}】，跳过解压ZIP文件：{zip_file.name}"
+                        )
+                        continue
 
-        await self.save_galleries()
+                    logger.info(f"正在解压文件：{zip_file.name}")
+                    if not unzip_file(zip_file.path, folder_path):
+                        logger.error(f"解压失败，跳过文件: {zip_file.name}")
+                        continue
+
+                    # 删除ZIP文件
+                    os.remove(zip_file.path)
+                    logger.info(f"解压成功并自动删除了压缩包：{zip_file.name}")
+
+                    # 确保解压目录存在且没有错误
+                    if os.path.exists(folder_path):
+                        # 解散可能存在的嵌套文件夹
+                        move_files_up(folder_path)
+
+                        # 加载为图库实例
+                        self.default_gallery_info["path"] = folder_path
+                        await self.load_gallery(self.default_gallery_info)
+                    else:
+                        logger.error(f"解压后的文件夹路径无效: {folder_path}")
 
     async def _update_keywords(self):
         """更新匹配词"""
@@ -115,7 +155,7 @@ class GalleryManager:
         fuzzy_keywords = []
 
         for gallery in self.galleries.values():
-            if gallery.fuzzy_match:
+            if gallery.fuzzy:
                 fuzzy_keywords.extend(gallery.keywords)
             else:
                 exact_keywords.extend(gallery.keywords)
@@ -123,20 +163,7 @@ class GalleryManager:
         self.exact_keywords = exact_keywords
         self.fuzzy_keywords = fuzzy_keywords
 
-    def is_image_file(self, file: Path):
-        """
-        判断文件是否为图片
-        """
-        return file.suffix.lower() in {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff"}
-
-    async def _create_gallery_instance(self, gallery_info):
-        """
-        创建图库实例
-        """
-        gallery = Gallery(gallery_info, self.galleries_dir)
-        self.galleries[gallery.name] = gallery
-
-    async def save_galleries(self):
+    async def _save_galleries(self):
         """
         将当前管理的图库信息保存到JSON文件
         """
@@ -145,114 +172,109 @@ class GalleryManager:
         async with aiofiles.open(self.json_file_path, "w", encoding="utf-8") as file:
             await file.write(json.dumps(galleries_data, indent=4, ensure_ascii=False))
 
-    async def add_gallery(self, gallery_info: dict) -> Gallery:
+    async def compress_gallery(self, name: str) -> str | None:
         """
-        添加新的图库
+        将指定图库压缩为ZIP文件
+        :param name: 图库名称
+        """
+        for galleries_dir in self.galleries_dirs:
+            folder_path = os.path.join(galleries_dir, name)
+            if os.path.exists(folder_path):
+                zip_path = os.path.join(galleries_dir, f"{name}.zip")
+                logger.info(f"正在将图库【{name}】压缩为ZIP文件")
+                if not zip_folder(str(folder_path), str(zip_path)):
+                    logger.error(f"压缩文件夹失败: {folder_path}")
+                    return None
+                logger.info(f"图库【{name}】已成功压缩为ZIP文件：{zip_path}")
+                return zip_path
+        return None
+
+    async def load_gallery(self, gallery_info: dict) -> Gallery:
+        """
+        加载图库为实例
         :param gallery_info: 图库信息字典
         """
-        gallery_name = gallery_info["name"]
-        if gallery_name not in self.galleries:
-            gallery = Gallery(gallery_info, self.galleries_dir)
-            self.galleries[gallery.name] = gallery
-            await self.save_galleries()
-            return gallery
-        return self.galleries[gallery_name]
+        gallery = Gallery(gallery_info)
+        self.galleries[gallery.name] = gallery
+        await self._save_galleries()
+        logger.debug(f"成功加载图库：{gallery.path}")
+        return gallery
 
-    async def delete_gallery(self, gallery_name: str) -> bool:
+    async def delete_gallery(self, name: str) -> bool:
         """
         根据图库名删除图库
         :param gallery_name: 图库名
         """
-        if gallery_name in self.galleries:
-            gallery = self.galleries[gallery_name]
+        if name in self.galleries:
+            gallery = self.galleries[name]
             gallery.delete()  # 删除图库文件夹
-            del self.galleries[gallery_name]  # 从字典中删除图库实例
-            await self.save_galleries()
+            del self.galleries[name]  # 从字典中删除图库实例
+            await self._save_galleries()
             return True
         else:
-            logger.error(f"图库不存在：{gallery_name}")
+            logger.error(f"图库不存在：{name}")
             return False
 
-    def get_gallery(self, gallery_name: str) -> Gallery | None:
-        """
-        根据图库名获取图库实例
-        :param gallery_name: 图库名
-        :return: Gallery实例
-        """
-        return self.galleries.get(gallery_name)
+    def get_gallery(self, name: str) -> Gallery | None:
+        """根据图库名获取图库实例"""
+        return self.galleries.get(name)
 
-    def list_galleries(self) -> list[dict]:
-        """
-        返回所有图库的基本信息
-        :return: 图库信息列表
-        """
-        return [gallery.to_dict() for gallery in self.galleries.values()]
-
-    async def set_password(self, gallery_name: str, password: str):
-        """设置图库访问密码"""
-        if gallery := self.get_gallery(gallery_name):
-            gallery.password = password
-            logger.info(f"图库访问密码：{password}")
-            await self.save_galleries()
-            return f"图库【{gallery_name}】密码已设置为：{password}"
-        return f"图库【{gallery_name}】不存在"
-
-    async def set_fuzzy_match(self, gallery_name: str, fuzzy_match: bool):
+    async def set_fuzzy(self, name: str, fuzzy: bool):
         """设置模糊匹配开关"""
-        if gallery := self.get_gallery(gallery_name):
-            gallery.fuzzy_match = fuzzy_match
-            await self.save_galleries()
-            return f"图库【{gallery_name}】模糊匹配：{fuzzy_match}"
-        return f"图库【{gallery_name}】不存在"
+        if gallery := self.get_gallery(name):
+            gallery.fuzzy = fuzzy
+            await self._save_galleries()
+            return f"图库【{name}】模糊匹配：{fuzzy}"
+        return f"图库【{name}】不存在"
 
-    async def set_max_capacity(self, gallery_name: str, max_capacity: int):
+    async def set_capacity(self, name: str, capacity: int):
         """设置图库容量上限"""
-        if gallery := self.get_gallery(gallery_name):
-            if max_capacity > 0:
-                gallery.max_capacity = max_capacity
-                await self.save_galleries()
-                return f"图库【{gallery_name}】容量上限已设置为：{max_capacity}"
+        if gallery := self.get_gallery(name):
+            if capacity > 0:
+                gallery.capacity = capacity
+                await self._save_galleries()
+                return f"图库【{name}】容量上限已设置为：{capacity}"
             else:
-                return f"图库容量上限错误：{max_capacity}，必须大于0"
-        return f"图库【{gallery_name}】不存在"
+                return f"图库容量上限错误：{capacity}，必须大于0"
+        return f"图库【{name}】不存在"
 
-    async def set_compress_switch(self, gallery_name: str, compress: bool):
+    async def set_compress(self, name: str, compress: bool):
         """设置图库新增图片时是否压缩"""
-        if gallery := self.get_gallery(gallery_name):
-            gallery.compress_switch = compress
-            await self.save_galleries()
-            return f"图库【{gallery.name}】压缩开关: {gallery.compress_switch}"
-        return f"图库【{gallery_name}】不存在"
+        if gallery := self.get_gallery(name):
+            gallery.compress = compress
+            await self._save_galleries()
+            return f"图库【{gallery.name}】压缩开关: {gallery.compress}"
+        return f"图库【{name}】不存在"
 
-    async def set_duplicate_switch(self, gallery_name: str, duplicate: bool):
+    async def set_duplicate(self, name: str, duplicate: bool):
         """设置图库新增图片时是否允许重复图片"""
-        if gallery := self.get_gallery(gallery_name):
-            gallery.duplicate_switch = duplicate
-            await self.save_galleries()
-            return f"图库【{gallery.name}】去重开关: {gallery.duplicate_switch}"
-        return f"图库【{gallery_name}】不存在"
+        if gallery := self.get_gallery(name):
+            gallery.duplicate = duplicate
+            await self._save_galleries()
+            return f"图库【{gallery.name}】去重开关: {gallery.duplicate}"
+        return f"图库【{name}】不存在"
 
-    async def add_keyword(self, gallery_name: str, keyword: str) -> str:
+    async def add_keyword(self, name: str, keyword: str) -> str:
         """添加图库匹配词"""
-        if gallery := self.get_gallery(gallery_name):
+        if gallery := self.get_gallery(name):
             if keyword not in gallery.keywords:
                 gallery.keywords.append(keyword)
-                await self.save_galleries()
+                await self._save_galleries()
                 return f"图库【{gallery.name}】新增匹配词：{keyword}"
             else:
                 return f"图库【{gallery.name}】已存在该匹配词"
-        return f"图库【{gallery_name}】不存在"
+        return f"图库【{name}】不存在"
 
-    async def delete_keyword(self, gallery_name: str, keyword: str) -> str:
+    async def delete_keyword(self, name: str, keyword: str) -> str:
         """删除图库匹配词"""
-        if gallery := self.get_gallery(gallery_name):
+        if gallery := self.get_gallery(name):
             if keyword in gallery.keywords:
                 gallery.keywords.remove(keyword)
-                await self.save_galleries()
-                return f"已删除图库【{gallery_name}】的匹配词：{keyword}"
+                await self._save_galleries()
+                return f"已删除图库【{name}】的匹配词：{keyword}"
             else:
-                return f"图库【{gallery_name}】不存在匹配词“{keyword}”"
-        return f"图库【{gallery_name}】不存在"
+                return f"图库【{name}】不存在匹配词“{keyword}”"
+        return f"图库【{name}】不存在"
 
     def get_gallery_by_attribute(self, **filters) -> list[Gallery]:
         """
