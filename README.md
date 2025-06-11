@@ -91,6 +91,11 @@ git clone https://github.com/Zhalslar/astrbot_plugin_gallery
             f"{prefix}上传图库 <图库名s> - 将图库打包成ZIP上传"
             f"{prefix}(引用ZIP)下载图库 <图库名> - 下载ZIP重命名后加载为图库"
 
+### 示例图（可以直接指定图库名，也可以直接@群友）
+
+![413b79119fd23390b1a4bf009aa2ca2](https://github.com/user-attachments/assets/d9a8fb21-3ef8-4e5a-816a-f758dd965a06)
+
+
 ## ⌨️ 配置
 
 请前往插件配置面板进行配置
