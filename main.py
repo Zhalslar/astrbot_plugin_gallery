@@ -28,7 +28,7 @@ GALLERIES_INFO_FILE = os.path.join("data", "plugins_data", "astrbot_plugin_galle
     "astrbot_plugin_gallery",
     "Zhalslar",
     "本地图库管理器",
-    "2.0.0",
+    "2.0.1",
     "https://github.com/Zhalslar/astrbot_plugin_gallery",
 )
 class GalleryPlugin(Star):
@@ -139,7 +139,8 @@ class GalleryPlugin(Star):
         if self.white_list and event.get_group_id() not in self.white_list:
             return
         # 响应含有图片的消息
-        if any(isinstance(seg, Comp.Image) for seg in event.get_messages()):
+        chain = event.get_messages()
+        if len(chain) == 1 and isinstance(chain[0], Comp.Image):
             args = await self._get_args(event, "")
             name = args["names"][0]
             label = args["labels"][0]
@@ -148,16 +149,17 @@ class GalleryPlugin(Star):
             # 图库不存在则创建
             if not gallery:
                 gallery = await self._creat_gallery(event, name=name)
+
             if image := await self._get_image(event, reply=False):
-                # 不收集需要压缩图片
+                # 如果配置为“不收集需要压缩的图片” 且 当前图片需要压缩
                 if not self.collect_compressed_img and gallery.need_compress(image):
+                    # 如果图库当前没有图片（即是空的），就删除这个图库
                     if not len(os.listdir(gallery.path)):
                          await self.gm.delete_gallery(name)
                     return
                 # 收集图片
                 result = gallery.add_image(image=image, label=label)
                 logger.info(f"自动收集图片：{result}")
-
     @filter.event_message_type(EventMessageType.ALL)
     async def handle_match(self, event: AstrMessageEvent):
         """精准匹配/模糊匹配用户消息"""
@@ -691,7 +693,9 @@ class GalleryPlugin(Star):
             else None
         )
         names = at_ids or texts or [sender_id]
-        labels = [name for name in (at_names, reply_name) if name] or [sender_name]
+        labels = [
+            name for name in (at_names, reply_name, sender_name, sender_id) if name
+        ]
 
         # 返回参数字典
         return {
