@@ -1,7 +1,6 @@
 import asyncio
 import json
 import os
-#from pathlib import Path
 import aiofiles
 from astrbot import logger
 from .gallery import Gallery
@@ -197,7 +196,6 @@ class GalleryManager:
         gallery = Gallery(gallery_info)
         self.galleries[gallery.name] = gallery
         await self._save_galleries()
-        logger.debug(f"成功加载图库：{gallery.path}")
         return gallery
 
     async def delete_gallery(self, name: str) -> bool:
