@@ -20,7 +20,7 @@ class Gallery:
 
         self.creator_id: str = gallery_info.get("creator_id", "Unknown")
         self.creator_name: str = gallery_info.get("creator_name", "Unknown")
-        self.creation_time: datetime = gallery_info.get(
+        self.creation_time: str = gallery_info.get(
             "creation_time", datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         )
         self.capacity = min(gallery_info.get("capacity", 200), 9999)
@@ -78,7 +78,11 @@ class Gallery:
 
     def _generate_name(self, image: bytes, label: str, index: int = 0) -> str:
         with Image.open(io.BytesIO(image)) as img:
-            extension = img.format.lower() if img.format else "jpg"
+            if img.format is None:
+                logger.warning("Image format could not be detected. Defaulting to 'jpg'.")
+                extension = "jpg"
+            else:
+                extension = img.format.lower()
 
         if index == 0:
             names = self._get_image_names()
@@ -113,8 +117,13 @@ class Gallery:
                             False, ResultType.TEXT, f"图库【{self.name}】中已存在该图片"
                         )
 
-        with open(os.path.join(self.path, name), "wb") as f:
-            f.write(image)
+        try:
+            with open(os.path.join(self.path, name), "wb") as f:
+                f.write(image)
+        except Exception as e:
+            return GalleryResult(
+                False, ResultType.TEXT, f"保存图片时发生错误：{str(e)}"
+            )
 
         return GalleryResult(
             True, ResultType.TEXT, f"图库【{self.name}】新增图片：\n{name}"

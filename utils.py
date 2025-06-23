@@ -136,7 +136,7 @@ async def get_image(
                 if msg_image := await download_file(img_url):
                     return msg_image
 
-def filter_text(text: str, max_length: int = 10) -> str:
+def filter_text(text: str, max_length: int = 128) -> str:
     """过滤字符，只保留中文、数字和字母, 并截短非数字字符串"""
     f_str = re.sub(r"[^\u4e00-\u9fa5a-zA-Z0-9]", "", text)
     return f_str[: max_length] if not f_str.isdigit() else f_str

@@ -1,6 +1,5 @@
 
 import os
-import re
 import random
 from typing import Callable, Awaitable
 from astrbot.core.provider.entities import LLMResponse
@@ -70,8 +69,6 @@ class GalleryPlugin(Star):
         self.default_fuzzy: bool = add_default_config.get(
             "default_fuzzy", False
         )
-        # 允许的图库名、图片名的最大长度
-        self.label_max_length: int = add_default_config.get("label_max_length", 4)
         # 图库的默认容量
         self.default_capacity: int = add_default_config.get("default_capacity", 200)
 
@@ -192,8 +189,8 @@ class GalleryPlugin(Star):
     ) -> str | None:
         """精准匹配/模糊匹配"""
         # 精准匹配
-        if text in self.gm.exact_keywords:
-            if random.random() < exact_prob:
+        if random.random() < exact_prob:
+            if text in self.gm.exact_keywords:
                 galleris = self.gm.get_gallery_by_attribute(name=text)
                 gallery = random.choice(galleris)
                 result = gallery.get_random_image()
@@ -202,9 +199,9 @@ class GalleryPlugin(Star):
                     return result.image_path
 
         # 模糊匹配
-        for keyword in self.gm.fuzzy_keywords:
-            if keyword in text:
-                if random.random() < fuzzy_prob:
+        if random.random() < fuzzy_prob:
+            for keyword in self.gm.fuzzy_keywords:
+                if keyword in text:
                     galleris = self.gm.get_gallery_by_keyword(keyword)
                     gallery = random.choice(galleris)
                     result = gallery.get_random_image()
@@ -652,12 +649,6 @@ class GalleryPlugin(Star):
             yield event.plain_result("解析失败")
             return
         yield event.plain_result(info_str)
-
-
-    def _filter_text(self, text: str) -> str:
-        """过滤字符，只保留中文、数字和字母, 并截短非数字字符串"""
-        f_str = re.sub(r"[^\u4e00-\u9fa5a-zA-Z0-9]", "", text)
-        return f_str[: self.label_max_length] if not f_str.isdigit() else f_str
 
     @filter.command("图库帮助")
     async def gallery_help(self, event: AstrMessageEvent):
