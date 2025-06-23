@@ -107,8 +107,7 @@ async def get_nickname(event: AstrMessageEvent, target_id: str):
         assert isinstance(event, AiocqhttpMessageEvent)
         client = event.bot
         user_info = await client.get_stranger_info(user_id=int(target_id))
-        nickname = user_info.get("nickname")
-        return nickname
+        return user_info.get("nickname")
     # TODO 适配更多消息平台
     return f"{target_id}"
 
@@ -139,7 +138,7 @@ async def get_image(
 def filter_text(text: str, max_length: int = 128) -> str:
     """过滤字符，只保留中文、数字和字母, 并截短非数字字符串"""
     f_str = re.sub(r"[^\u4e00-\u9fa5a-zA-Z0-9]", "", text)
-    return f_str[: max_length] if not f_str.isdigit() else f_str
+    return f_str if f_str.isdigit() else f_str[:max_length]
 
 async def get_args(event: AstrMessageEvent, cmd: str):
         """获取参数"""
@@ -162,8 +161,7 @@ async def get_args(event: AstrMessageEvent, cmd: str):
                 else:
                     texts.append(arg)  # 不满足条件的数字加入 texts
             else:  # 如果是文本
-                filtered_arg = filter_text(arg)
-                if filtered_arg:
+                if filtered_arg := filter_text(arg):
                     if arg.startswith("@"):
                         at_names.append(filtered_arg)
                     else:

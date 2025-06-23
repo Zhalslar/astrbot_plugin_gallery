@@ -189,14 +189,13 @@ class GalleryPlugin(Star):
     ) -> str | None:
         """精准匹配/模糊匹配"""
         # 精准匹配
-        if random.random() < exact_prob:
-            if text in self.gm.exact_keywords:
-                galleris = self.gm.get_gallery_by_attribute(name=text)
-                gallery = random.choice(galleris)
-                result = gallery.get_random_image()
-                if result.image_path:
-                    logger.info(f"匹配到图片：{result.image_path}")
-                    return result.image_path
+        if random.random() < exact_prob and text in self.gm.exact_keywords:
+            galleris = self.gm.get_gallery_by_attribute(name=text)
+            gallery = random.choice(galleris)
+            result = gallery.get_random_image()
+            if result.image_path:
+                logger.info(f"匹配到图片：{result.image_path}")
+                return result.image_path
 
         # 模糊匹配
         if random.random() < fuzzy_prob:
@@ -251,7 +250,7 @@ class GalleryPlugin(Star):
 
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("添加匹配词", priority=1)
-    async def add_ketord(
+    async def add_keyword(
         self,
         event: AstrMessageEvent,
     ):
