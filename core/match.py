@@ -59,7 +59,5 @@ class RelevanceBM25:
 
         # ---- 归一化（线性可控） ----
         max_score = len(q_words) * (1 + self.k1)
-        if max_score <= 0:
-            return 0.0
 
-        return round(min(raw / max_score, 1.0), 6)
+        return 0.0 if max_score <= 0 else round(min(raw / max_score, 1.0), 6)

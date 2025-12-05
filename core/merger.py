@@ -17,12 +17,12 @@ class GalleryImageMerger:
 
     def _process_image(self, img_path, sequence_number, font) -> Image.Image | None:
         try:
-            img = Image.open(img_path).convert("RGB")
-
+            img = Image.open(img_path)
             # GIF 取第一帧
             if img.format == "GIF":
                 img.seek(0)
-
+            # 转换为 RGB
+            img = img.convert("RGB")
             # 缩放
             img = img.resize(self.thumbnail_size)
 

@@ -171,12 +171,12 @@ class GalleryAuto:
         if random.random() < conf["user_prob"]:
             for gallery in self.manager.get_all_gallery():
                 score = self.matcher.calc(tags=gallery.tags, msg=text)
-                print(f"{gallery.tags}: {score}")
+                #print(f"{gallery.tags}: {score}")
                 if score > conf["user_threshold"]:
                     succ, image = gallery.get_random_image()
                     if succ:
                         await event.send(event.image_result(image))  # type: ignore
-                        break
+                    break
 
     async def match_llm_msg(self, event: AstrMessageEvent, resp: LLMResponse):
         """给LLM响应的消息匹配图片"""

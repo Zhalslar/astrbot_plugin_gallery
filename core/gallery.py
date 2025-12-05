@@ -151,8 +151,7 @@ class Gallery:
             return False, f"图库【{self.name}】容量已满"
 
         if self.compress:
-            result = compress_image(image, max_size = 512)
-            if result:
+            if result := compress_image(image, max_size=512):
                 image = result
 
         for img in images:

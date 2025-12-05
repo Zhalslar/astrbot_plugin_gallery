@@ -212,5 +212,6 @@ class GalleryManager:
         """设置图库标签"""
         if gallery := self.get_gallery(name):
             gallery.tags = tags
+            await self._save_to_db()
             return f"图库【{gallery.name}】标签已设为：{tags}"
         return f"图库【{name}】不存在"

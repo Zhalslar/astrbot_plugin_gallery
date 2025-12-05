@@ -51,13 +51,11 @@ class GalleryOperate:
         result = await self.manager.set_capacity(name, capacity=capacity)
         await event.send(event.plain_result(result))
 
-    async def switch_compress(self, event: AstrMessageEvent, mode: bool, name: str):
+    async def set_compress(self, event: AstrMessageEvent, mode: bool):
         """打开/关闭图库的压缩开关"""
         args = await get_args(event)
         result = []
         for name in args["names"]:
-            args = await get_args(event)
-
             gallery = self.manager.get_gallery(name)
             if not gallery:
                 result.append(f"未找到图库【{name}】")
@@ -77,10 +75,10 @@ class GalleryOperate:
 
         sender_id = event.get_sender_id()
         sender_name = event.get_sender_name()
-        gallery = self.manager.get_gallery(name)
 
-        if not gallery:
-            gallery = await self.manager.create_gallery(name, sender_id, sender_name)
+        gallery = self.manager.get_gallery(name) or await self.manager.create_gallery(
+            name, sender_id, sender_name
+        )
 
         #  权限验证
         perm = self.conf["perm_config"]["allow_add"]
@@ -93,7 +91,7 @@ class GalleryOperate:
 
         #  图片存在，直接图片处理
         if image:
-            succ, result = gallery.add_image(image=image, author=author, index=index) # type: ignore
+            succ, result = gallery.add_image(image=image, author=author, index=index)  # type: ignore
             if succ:
                 await event.send(event.plain_result(result))
         #  图片不存在，等待用户发图片
@@ -186,7 +184,7 @@ class GalleryOperate:
             for index in indexs:
                 succ, result = gallery.view_by_index(index)
                 if succ:
-                    await event.send(event.image_result(result)) # type: ignore
+                    await event.send(event.image_result(result))  # type: ignore
                 else:
                     await event.send(event.plain_result(result))  # type: ignore
 
@@ -205,10 +203,11 @@ class GalleryOperate:
             await event.send(event.plain_result("未创建任何图库"))
             return
         names = self.manager.get_all_galleries_names()
-        await event.send(event.plain_result(
-            f"------共{len(galleries)}个图库------\n{'、'.join(names)}"
-        ))
-
+        await event.send(
+            event.plain_result(
+                f"------共{len(galleries)}个图库------\n{'、'.join(names)}"
+            )
+        )
 
     async def gallery_details(self, event: AstrMessageEvent):
         """查看图库的详细信息"""
@@ -219,7 +218,6 @@ class GalleryOperate:
                 await event.send(event.plain_result(f"未找到图库【{name}】"))
                 return
             await event.send(event.plain_result(gallery.to_str()))
-
 
     async def find_path(self, event: AstrMessageEvent):
         """查看图库路径"""

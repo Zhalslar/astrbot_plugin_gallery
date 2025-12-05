@@ -29,10 +29,9 @@ class GalleryPlugin(Star):
         super().__init__(context)
         self.context = context
         self.conf = config
-        self.plugin_data_dir = StarTools.get_data_dir("astrbot_plugin_qqadmin")
-        self.db_path = str(self.plugin_data_dir / "gallery_info.josn")
+        self.plugin_data_dir = StarTools.get_data_dir("astrbot_plugin_gallery")
+        self.db_path = str(self.plugin_data_dir / "gallery_info.json")
         self.galleries_dir = os.path.abspath(config["galleries_dir"])
-
 
     async def initialize(self):
         """初始化"""
@@ -66,20 +65,20 @@ class GalleryPlugin(Star):
         self,
         event: AstrMessageEvent,
     ):
-        """添加标签到指定图库"""
+        """设置图库的标签"""
         await self.operator.set_tags(event)
 
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("设置容量", priority=1)
     async def set_max_capacity(self, event: AstrMessageEvent):
-        """设置指定图库的最大容量"""
+        """设置图库的最大容量"""
         await self.operator.set_max_capacity(event)
 
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("压缩", priority=1)
-    async def switch_compress(self, event: AstrMessageEvent, mode: bool, name: str):
+    async def set_compress(self, event: AstrMessageEvent, mode: bool):
         """打开/关闭图库的压缩开关"""
-        await self.operator.switch_compress(event, mode, name)
+        await self.operator.set_compress(event, mode)
 
     @filter.command("存图", priority=1)
     async def add_images(self, event: AstrMessageEvent):
