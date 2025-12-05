@@ -65,7 +65,7 @@
                 "description": "自动收集总开关",
                 "type": "bool",
                 "hint": "",
-                "default": true
+                "default": false
             },
             "whitelist": {
                 "description": "启用自动收集的群聊白名单",
@@ -84,7 +84,7 @@
                 "description": "LLM打标CD(秒)",
                 "type": "int",
                 "hint": "冷却时间内不收集图片进行打标，可有效防止LLM被频繁调用",
-                "default": 60
+                "default": 120
             }
         }
     },
@@ -97,7 +97,7 @@
                 "description": "匹配用户消息的概率",
                 "type": "float",
                 "hint": "设为 0 则关闭，设为 1 则每条用户发的消息都进行匹配",
-                "default": 0.11
+                "default": 0
             },
             "user_threshold": {
                 "description": "匹配用户消息的阈值",
@@ -109,7 +109,7 @@
                 "description": "匹配LLM消息的概率",
                 "type": "float",
                 "hint": "设为 0 则关闭，设为 1 则每条LLM返回的消息都进行匹配",
-                "default": 0.12
+                "default": 0
             },
             "llm_threshold": {
                 "description": "匹配LLM消息的阈值",
@@ -118,5 +118,11 @@
                 "default": 0.5
             }
         }
+    },
+    "http_proxy": {
+        "description": "HTTP代理地址",
+        "type": "string",
+        "hint": "用于需要外部网络请求的功能，例如图片地理位置解析(OSM)。例如: http://127.0.0.1:7890，留空则不使用代理",
+        "default": ""
     }
 }

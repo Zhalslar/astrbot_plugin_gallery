@@ -37,7 +37,7 @@ class GalleryPlugin(Star):
         """初始化"""
         self.db = GalleryDB(self.db_path)
         self.merger = GalleryImageMerger()
-        self.extractor = ImageInfoExtractor()
+        self.extractor = ImageInfoExtractor(self.conf)
         self.manager = GalleryManager(self.conf, self.db, self.galleries_dir)
         await self.manager.initialize()
         self.operator = GalleryOperate(self.conf, self.manager, self.merger)
