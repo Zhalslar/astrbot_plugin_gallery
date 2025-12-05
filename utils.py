@@ -1,12 +1,39 @@
 
-import re
-import aiohttp
-import zipfile
+import io
 import os
-import shutil
+import re
+
+import aiohttp
+from PIL import Image as PILImage
+
 from astrbot import logger
 from astrbot.core.message.components import At, Image, Reply
 from astrbot.core.platform.astr_message_event import AstrMessageEvent
+
+HELP_TEXT = (
+    "【图库帮助】(标有s表示可输入多个,空格隔开参数,图库名皆可用@某人代替)\n\n"
+    "精准匹配词 - 查看精准匹配词\n\n"
+    "模糊匹配词 - 查看模糊匹配词\n\n"
+    "模糊匹配 <图库名s> - 将指定图库切换到模糊匹配模式\n\n"
+    "精准匹配 <图库名s> - 将指定图库切换到精准匹配模式\n\n"
+    "添加匹配词 <图库名> <匹配词s> - 为指定图库添加匹配词\n\n"
+    "删除匹配词 <图库名> <匹配词s> - 为指定图库删除匹配词\n\n"
+    "设置容量 <图库名> <容量> - 设置指定图库的容量上限\n\n"
+    "开启压缩 <图库名s> 打开指定图库的压缩开关\n\n"
+    "关闭压缩 <图库名s> 关闭指定图库的压缩开关\n\n"
+    "开启去重 <图库名s> 打开指定图库的去重开关\n\n"
+    "关闭去重 <图库名s> 关闭指定图库的去重开关\n\n"
+    "去重 <图库名s> 去除图库里重复的图片\n\n"
+    "存图 <图库名> <序号> - 存图到指定图库，序号指定时会替换掉原图，图库名不填则默认自己昵称，可也@他人作为图库名\n\n"
+    "删图 <图库名> <序号s> - 删除指定图库中的图片，序号不指定表示删除整个图库\n\n"
+    "查看 <序号s/图库名> - 查看指定图库中的图片或图库详情，序号指定时查看单张图片\n\n"
+    "图库列表 - 查看所有图库\n\n"
+    "图库详情 <图库名s> - 查看指定图库的详细信息\n\n"
+    "(引用图片)/路径 <图库名s> - 查看指定图片的路径，需指定在哪个图库查找\n\n"
+    "(引用图片)/解析 - 解析图片的信息"
+    "上传图库 <图库名s> - 将图库打包成ZIP上传"
+    "(引用ZIP)下载图库 <图库名> - 下载ZIP重命名后加载为图库"
+)
 
 def get_dirs(path: str) ->  list[str]:
     """
@@ -31,71 +58,6 @@ async def download_file(url: str) -> bytes | None:
     except Exception as e:
         logger.error(f"图片下载失败: {e}")
 
-def unzip_file(zip_path: str, folder_path: str) -> bool:
-    """解压压缩包，成功返回True，失败返回False"""
-    try:
-        with zipfile.ZipFile(zip_path, "r") as zip_ref:
-            zip_ref.extractall(folder_path)
-        return True
-    except Exception as e:
-        logger.error(f"解压文件 {zip_path} 失败: {e}")
-        return False
-
-
-def zip_folder(folder_path: str, zip_path: str) -> bool:
-    """压缩文件夹，成功返回True，失败返回False"""
-    try:
-        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
-            for root, dirs, files in os.walk(folder_path):
-                for file in files:
-                    file_path = os.path.join(root, file)
-                    zipf.write(
-                        file_path, arcname=os.path.relpath(file_path, start=folder_path)
-                    )
-        return True
-    except Exception as e:
-        logger.error(f"压缩文件夹 {folder_path} 失败: {e}")
-        return False
-
-
-def move_files_up(directory):
-    """
-    如果目录下只有一个子文件夹，移动其中的所有文件和子文件夹到上一级目录，并删除该子文件夹。
-    递归检查直到不满足条件。
-    保持子文件夹内的文件结构。
-    """
-    while True:
-        # 获取目录下所有的子目录和文件
-        entries = os.listdir(directory)
-        subfolders = [
-            entry for entry in entries if os.path.isdir(os.path.join(directory, entry))
-        ]
-
-        # 如果只有一个子文件夹
-        if len(subfolders) == 1:
-            subfolder_path = os.path.join(directory, subfolders[0])
-
-            # 遍历子文件夹中的所有内容并移动到上一级目录
-            for root, dirs, files in os.walk(subfolder_path, topdown=False):
-                # 移动文件
-                for file in files:
-                    file_path = os.path.join(root, file)
-                    shutil.move(file_path, os.path.join(directory, file))
-
-                # 移动子文件夹
-                for dir in dirs:
-                    dir_path = os.path.join(root, dir)
-                    shutil.move(dir_path, os.path.join(directory, dir))
-
-            # 删除子文件夹
-            shutil.rmtree(subfolder_path)
-
-            # 继续检查上级目录
-            continue
-
-        # 如果不是只有一个子文件夹，退出循环
-        break
-
 
 async def get_nickname(event: AstrMessageEvent, target_id: str):
     """从消息平台获取参数"""
@@ -113,8 +75,8 @@ async def get_nickname(event: AstrMessageEvent, target_id: str):
 
 
 async def get_image(
-   event: AstrMessageEvent, reply: bool = True
-) -> bytes | None:
+   event: AstrMessageEvent, reply: bool = True, get_url: bool = False
+) -> bytes | str | None:
     """获取图片"""
     chain = event.get_messages()
     # 遍历引用消息
@@ -126,12 +88,16 @@ async def get_image(
             for seg in reply_seg.chain:
                 if isinstance(seg, Image):
                     if img_url := seg.url:
+                        if get_url:  # 获取图片URL
+                            return img_url
                         if msg_image := await download_file(img_url):
                             return msg_image
     # 遍历原始消息
     for seg in chain:
         if isinstance(seg, Image):
             if img_url := seg.url:
+                if get_url:  # 获取图片URL
+                    return img_url
                 if msg_image := await download_file(img_url):
                     return msg_image
 
@@ -140,15 +106,14 @@ def filter_text(text: str, max_length: int = 128) -> str:
     f_str = re.sub(r"[^\u4e00-\u9fa5a-zA-Z0-9]", "", text)
     return f_str if f_str.isdigit() else f_str[:max_length]
 
-async def get_args(event: AstrMessageEvent, cmd: str):
+async def get_args(event: AstrMessageEvent):
         """获取参数"""
         # 初始化默认值
         sender_id = filter_text(event.get_sender_id())
         sender_name = filter_text(event.get_sender_name())
-        message_str = event.message_str
 
         # 解析消息文本
-        args = message_str.removeprefix(cmd).strip().split(" ")
+        args = event.message_str.strip().split()[1:]
         texts: list[str] = []
         numbers: list[int] = []
         at_names: list[str] = []
@@ -201,3 +166,24 @@ async def get_args(event: AstrMessageEvent, cmd: str):
             "names": names,
             "labels": labels,
         }
+
+
+def compress_image(image: bytes, max_size: int = 512) -> bytes | None:
+    """压缩图片"""
+    try:
+        with PILImage.open(io.BytesIO(image)) as img:
+            # GIF 不压缩
+            if img.format == "GIF":
+                return image
+            # 尺寸不超过 max_size，不压缩
+            if img.width <= max_size and img.height <= max_size:
+                return image
+            # 执行压缩
+            img.thumbnail((max_size, max_size), PILImage.Resampling.LANCZOS)
+            output = io.BytesIO()
+            img.save(output, format=img.format)
+            return output.getvalue()
+    except Exception as e:
+        logger.error(f"压缩图片失败：{e}")
+        return None
+
