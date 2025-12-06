@@ -1,115 +1,33 @@
 {
-    "galleries_dirs": {
-        "description": "图库总目录列表",
-        "type": "list",
+    "galleries_dir": {
+        "description": "图库总目录",
+        "type": "string",
         "obvious_hint": true,
-        "hint": "每个目录下存储着图库的文件夹，第一条路径为默认的总目录，自定义的路径时请务必使用绝对路径(不要带双引号)",
-        "default": [
-            "data/plugins_data/astrbot_plugin_gallery"
-        ]
+        "hint": "总目录下存储着各个图库的文件夹, 支持绝对路径和相对路径",
+        "default": "data/plugin_data/astrbot_plugin_gallery/galleries"
     },
-    "user_config": {
-        "description": "用户消息触发",
-        "type": "object",
-        "hint": "",
-        "items": {
-            "user_min_msg_len": {
-                "description": "用户消息最小长度限制",
-                "type": "int",
-                "hint": "不超过此长度时不进行图库匹配",
-                "default": 1
-            },
-            "user_max_msg_len": {
-                "description": "用户消息最大长度限制",
-                "type": "int",
-                "hint": "超过此长度时不进行图库匹配",
-                "default": 30
-            },
-            "user_exact_prob": {
-                "description": "精准匹配用户消息时的发图概率",
-                "type": "float",
-                "hint": "",
-                "default": 0.9
-            },
-            "user_fuzzy_prob": {
-                "description": "模糊匹配用户消息时的发图概率",
-                "type": "float",
-                "hint": "",
-                "default": 0.5
-            }
-        }
-    },
-    "llm_config": {
-        "description": "LLM消息触发",
-        "type": "object",
-        "hint": "",
-        "items": {
-            "llm_min_msg_len": {
-                "description": "LLM消息最小长度限制",
-                "type": "int",
-                "hint": "不超过此长度时不进行图库匹配",
-                "default": 1
-            },
-            "llm_max_msg_len": {
-                "description": "LLM消息最大长度限制",
-                "type": "int",
-                "hint": "超过此长度时不进行图库匹配",
-                "default": 50
-            },
-            "llm_exact_prob": {
-                "description": "精准匹配LLM消息时的发图概率",
-                "type": "float",
-                "hint": "",
-                "default": 0.9
-            },
-            "llm_fuzzy_prob": {
-                "description": "模糊匹配LLM消息时的发图概率",
-                "type": "float",
-                "hint": "",
-                "default": 0.5
-            }
-        }
-    },
-    "add_default_config": {
+    "add_default": {
         "description": "新建图库时的默认参数",
         "type": "object",
         "hint": "",
         "items": {
-            "default_compress": {
-                "description": "新建图库时自动打开压缩开关",
+            "compress": {
+                "description": "自动压缩",
                 "type": "bool",
-                "hint": "往新图库存图时，若图片尺寸大于压缩阈值则压缩图片",
+                "hint": "开启后，往新图库存图时，若图片尺寸大于 512 x 512 则压缩图片，此尺寸的图片QQ会显示为表情包大小",
                 "default": true
             },
-            "compress_size": {
-                "description": "压缩阈值",
-                "type": "int",
-                "hint": "单位为像素，图片在512像素以下时qq以小图显示",
-                "default": 512
-            },
-            "default_duplicate": {
-                "description": "新建图库时自动打开去重开关",
-                "type": "bool",
-                "hint": "往新图库存图时，若存在重复图片则终止操作",
-                "default": true
-            },
-            "default_fuzzy": {
-                "description": "新建图库时自动设置为模糊匹配",
-                "type": "bool",
-                "hint": "",
-                "default": false
-            },
-            "label_max_length": {
-                "description": "新建图库名最大长度",
-                "type": "int",
-                "hint": "单位为字符，超过此长度会被截断(仅对公共图库生效)",
-                "default": 10
-            },
-            "default_capacity": {
+            "capacity": {
                 "description": "图库的默认容量上限",
                 "type": "int",
                 "hint": "图库中的图片数量达到此数量时，图库将无法添加图片，为了区别QQ号与数值，设置的数值不要超过10000",
                 "default": 200
+            },
+            "name_max_length": {
+                "description": "图库名最大长度（字符）",
+                "type": "int",
+                "hint": "用户设定的图库名长度超过此长度会被截断(仅对公共图库生效)",
+                "default": 10
             }
         }
     },
@@ -138,29 +56,73 @@
             }
         }
     },
-    "auto_collect_config": {
-        "description": "自动收集设置",
+    "auto_collect": {
+        "description": "自动收集配置",
         "type": "object",
-        "hint": "当图库的图片较少时，可以打开自动收集功能，将自动收集用户图片，存到每个人对应的图库",
+        "hint": "本插件可自动收集群友发的表情包，并用LLM进行打标归类，方便调用",
         "items": {
             "enable_collect": {
-                "description": "启用自动收集",
+                "description": "自动收集总开关",
                 "type": "bool",
                 "hint": "",
-                "default": true
+                "default": false
             },
-            "white_list": {
+            "whitelist": {
                 "description": "启用自动收集的群聊白名单",
                 "type": "list",
                 "hint": "不填表示启用所有群聊",
                 "default": []
             },
-            "collect_compressed_img": {
-                "description": "图片达到压缩阈值时是否仍然收集",
-                "type": "bool",
-                "hint": "仅对开启了去重的图库有效，未开启去重的图库不受限",
-                "default": false
+            "provider_id": {
+                "description": "给图片打标用的LLM提供商",
+                "type": "string",
+                "default": "",
+                "hint": "留空或者填写的提供商不存在时，则使用当前正在使用的LLM提供商。 注意所选模型必须具备图片识别能力",
+                "_special": "select_provider"
+            },
+            "collect_cd": {
+                "description": "LLM打标CD(秒)",
+                "type": "int",
+                "hint": "冷却时间内不收集图片进行打标，可有效防止LLM被频繁调用",
+                "default": 120
             }
         }
+    },
+    "auto_match": {
+        "description": "自动发表情配置",
+        "type": "object",
+        "hint": "注意：本插件采用纯算法，根据图库标签来匹配表情包，避免了匹配阶段对token的消耗",
+        "items": {
+            "user_prob": {
+                "description": "匹配用户消息的概率",
+                "type": "float",
+                "hint": "设为 0 则关闭，设为 1 则每条用户发的消息都进行匹配",
+                "default": 0
+            },
+            "user_threshold": {
+                "description": "匹配用户消息的阈值",
+                "type": "float",
+                "hint": "用户发的消息与某图库标签匹配后，得到的相似度若大于此阈值时，则匹配成功，然后从此图库随机抽取一张图片来发送",
+                "default": 0.5
+            },
+            "llm_prob": {
+                "description": "匹配LLM消息的概率",
+                "type": "float",
+                "hint": "设为 0 则关闭，设为 1 则每条LLM返回的消息都进行匹配",
+                "default": 0
+            },
+            "llm_threshold": {
+                "description": "匹配LLM消息的阈值",
+                "type": "float",
+                "hint": "LLM响应返回的消息与某图库标签匹配后，得到的相似度若大于此阈值时，则匹配成功，然后从此图库随机抽取一张图片来发送",
+                "default": 0.5
+            }
+        }
+    },
+    "http_proxy": {
+        "description": "HTTP代理地址",
+        "type": "string",
+        "hint": "用于需要外部网络请求的功能，例如图片地理位置解析(OSM)。例如: http://127.0.0.1:7890，留空则不使用代理",
+        "default": ""
     }
 }

@@ -5,31 +5,61 @@ import random
 import re
 import shutil
 from datetime import datetime
+
 from PIL import Image
+
 from astrbot import logger
-from data.plugins.astrbot_plugin_gallery.utils import filter_text
-from ..core.merge import create_merged_image
-from .gallery_result import GalleryResult, ResultType
+
+from ..utils import compress_image, filter_text
 
 
 class Gallery:
-    def __init__(self, gallery_info: dict):
-        self.name: str = os.path.basename(gallery_info["path"])
-        self.path: str = gallery_info["path"]
+    """
+    图库类，用于管理单个图库
+    """
+
+    EXT = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff"}
+
+    def __init__(
+        self,
+        path: str,
+        name: str | None = None,
+        creator_id: str = "Unknown",
+        creator_name: str = "Unknown",
+        creation_time: str | None = None,
+        capacity: int = 200,
+        compress: bool = False,
+        tags: list[str] | None = None,
+    ):
+        self.path = path
         os.makedirs(self.path, exist_ok=True)
 
-        self.creator_id: str = gallery_info.get("creator_id", "Unknown")
-        self.creator_name: str = gallery_info.get("creator_name", "Unknown")
-        self.creation_time: str = gallery_info.get(
-            "creation_time", datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.name = name or os.path.basename(path)
+
+        self.creator_id = creator_id
+        self.creator_name = creator_name
+        self.creation_time = creation_time or datetime.now().strftime(
+            "%Y-%m-%d %H:%M:%S"
         )
-        self.capacity = min(gallery_info.get("capacity", 200), 9999)
-        self.compress: bool = gallery_info.get("compress", False)
-        self.duplicate: bool = gallery_info.get("duplicate", True)
-        self.fuzzy: bool = gallery_info.get("fuzzy", False)
-        self.keywords: list[str] = gallery_info.get("keywords", [self.name])
+        self.capacity = min(capacity, 9999)
+        self.compress = compress
+        self.tags = tags or []
 
         asyncio.create_task(self._specify_names())
+
+
+    @classmethod
+    def from_dict(cls, d: dict):
+        """工厂方法: 从字典中创建图库对象"""
+        return cls(
+            path=d["path"],
+            creator_id=d.get("creator_id", "Unknown"),
+            creator_name=d.get("creator_name", "Unknown"),
+            creation_time=d.get("creation_time"),
+            capacity=d.get("capacity", 200),
+            compress=d.get("compress", False),
+            tags=d.get("tags", [os.path.basename(d["path"])]),
+        )
 
     def to_dict(self):
         return {
@@ -40,18 +70,30 @@ class Gallery:
             "creation_time": self.creation_time,
             "capacity": self.capacity,
             "compress": self.compress,
-            "duplicate": self.duplicate,
-            "fuzzy": self.fuzzy,
-            "keywords": self.keywords,
+            "tags": self.tags,
         }
 
+    def to_str(self):
+        return (
+            f"图库名称：{self.name}\n"
+            f"图库路径：{self.path}\n"
+            f"创建者ID：{self.creator_id}\n"
+            f"创建之人：{self.creator_name}\n"
+            f"创建时间：{self.creation_time}\n"
+            f"容量上限：{self.capacity}\n"
+            f"已用容量：{len(os.listdir(self.path))}\n"
+            f"压缩图片：{self.compress}\n"
+            f"图库标签： {self.tags}"
+        )
+
     async def _specify_names(self):
+        """规范化图片名称"""
         for image_file in self._get_images():
             if not re.match(r"^[^_]+_\d+_[^_]+\.\w+$", image_file.name):
                 with open(image_file.path, "rb") as f:
                     image = f.read()
-                label = filter_text(image_file.name)
-                new_name = self._generate_name(image, label)
+                author = filter_text(image_file.name)
+                new_name = self._generate_name(image, author)
                 if new_name != image_file.name:
                     try:
                         new_path = os.path.join(self.path, new_name)
@@ -64,22 +106,25 @@ class Gallery:
                 await asyncio.sleep(0.1)
 
     def _get_images(self) -> list[os.DirEntry]:
-        image_extensions = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff"}
+        """获取图片文件"""
         with os.scandir(self.path) as entries:
             return [
                 entry
                 for entry in entries
-                if entry.is_file()
-                and entry.name.lower().endswith(tuple(image_extensions))
+                if entry.is_file() and entry.name.lower().endswith(tuple(self.EXT))
             ]
 
     def _get_image_names(self) -> list[str]:
+        """获取图片名称"""
         return [entry.name for entry in self._get_images()]
 
-    def _generate_name(self, image: bytes, label: str, index: int = 0) -> str:
+    def _generate_name(self, image: bytes, author: str = "", index: int = 0) -> str:
+        """生成图片名称"""
         with Image.open(io.BytesIO(image)) as img:
             if img.format is None:
-                logger.warning("Image format could not be detected. Defaulting to 'jpg'.")
+                logger.warning(
+                    "Image format could not be detected. Defaulting to 'jpg'."
+                )
                 extension = "jpg"
             else:
                 extension = img.format.lower()
@@ -95,120 +140,73 @@ class Gallery:
             while index in existing_numbers:
                 index += 1
 
-        return f"{self.name}_{index}_{label}.{extension}"
+        return f"{self.name}_{index}_{author}.{extension}"
 
-    def add_image(self, image: bytes, label: str, index: int = 0) -> GalleryResult:
-        name = self._generate_name(image, label, index)
+    def add_image(self, image: bytes, author: str = "default", index: int = 0) -> tuple[bool, str]:
+        """添加图片"""
+        img_name = self._generate_name(image, author, index)
         images = self._get_images()
 
         if len(images) >= self.capacity:
-            return GalleryResult(False, ResultType.TEXT, f"图库【{self.name}】容量已满")
+            return False, f"图库【{self.name}】容量已满"
 
-        if self.need_compress(image):
-            result = self.compress_image(image)
-            if result:
+        if self.compress:
+            if result := compress_image(image, max_size=512):
                 image = result
 
-        if self.duplicate:
-            for img in images:
-                with open(img.path, "rb") as file:
-                    if file.read() == image:
-                        return GalleryResult(
-                            False, ResultType.TEXT, f"图库【{self.name}】中已存在该图片"
-                        )
+        for img in images:
+            with open(img.path, "rb") as file:
+                if file.read() == image:
+                    return False, f"图库【{self.name}】中已存在该图片"
 
         try:
-            with open(os.path.join(self.path, name), "wb") as f:
+            with open(os.path.join(self.path, img_name), "wb") as f:
                 f.write(image)
         except Exception as e:
-            return GalleryResult(
-                False, ResultType.TEXT, f"保存图片时发生错误：{str(e)}"
-            )
+            return False, f"保存图片时发生错误：{str(e)}"
 
-        return GalleryResult(
-            True, ResultType.TEXT, f"图库【{self.name}】新增图片：\n{name}"
-        )
+        return True, f"图库【{self.name}】新增图片：\n{img_name}"
 
     def delete(self):
+        """删除图库"""
         abs_path = os.path.abspath(self.path)
         if os.path.exists(abs_path):
             shutil.rmtree(abs_path)
 
-    def delete_image_by_index(self, index: str | int) -> GalleryResult:
+    def delete_image_by_index(self, index: str | int) -> tuple[bool, str]:
+        """通过索引删除图片"""
         names = self._get_image_names()
         if not names:
-            return GalleryResult(False, ResultType.TEXT, f"图库【{self.name}】为空")
+            return False, f"图库【{self.name}】为空"
         name = next((n for n in names if n.split("_")[1] == str(index)), None)
         if name:
             os.remove(os.path.join(self.path, name))
-            return GalleryResult(
-                True, ResultType.TEXT, f"图库【{self.name}】已删除图片：\n{name}"
-            )
-        return GalleryResult(
-            False, ResultType.TEXT, f"图库【{self.name}】中不存在图{index}"
-        )
+            return True, f"图库【{self.name}】已删除图片：\n{name}"
+        return False, f"图库【{self.name}】中不存在图{index}"
 
-    def view_by_index(self, index: str | int) -> GalleryResult:
+    def view_by_index(self, index: str | int) -> tuple[bool, str | os.PathLike]:
+        """通过索引查看图片"""
         names = self._get_image_names()
         if not names:
-            return GalleryResult(False, ResultType.TEXT, f"图库【{self.name}】为空")
+            return False, f"图库【{self.name}】为空"
         name = next((n for n in names if n.split("_")[1] == str(index)), None)
         if name:
-            return GalleryResult(
-                True, ResultType.IMAGE_PATH, os.path.join(self.path, name)
-            )
-        return GalleryResult(
-            False, ResultType.TEXT, f"图库【{self.name}】中不存在图{index}"
-        )
+            return True, os.path.join(self.path, name)
+        return False, f"图库【{self.name}】中不存在图{index}"
 
-    def view_by_bytes(self, image: bytes) -> GalleryResult:
+    def view_by_bytes(self, image: bytes) -> tuple[bool, str | os.PathLike]:
+        """通过字节查看图片"""
         for file in self._get_images():
             with open(file.path, "rb") as f:
                 if f.read() == image:
-                    return GalleryResult(True, ResultType.TEXT, file.name)
-        return GalleryResult(False, ResultType.TEXT, f"图库【{self.name}】中没有这张图")
+                    return True, file.name
+        return False, f"图库【{self.name}】中没有这张图"
 
-    def preview(self) -> GalleryResult:
-        result = create_merged_image(self.path)
-        if not result:
-            return GalleryResult(False, ResultType.TEXT, f"图库【{self.name}】为空")
-        return GalleryResult(True, ResultType.IMAGE_BYTES, result)
-
-    def get_random_image(self) -> GalleryResult:
+    def get_random_image(self) -> tuple[bool, str | os.PathLike]:
+        """获取一张随机图片"""
         images = self._get_images()
         if not images:
-            return GalleryResult(False, ResultType.TEXT, f"图库【{self.name}】为空")
-        return GalleryResult(True, ResultType.IMAGE_PATH, random.choice(images).path)
+            return False, f"图库【{self.name}】为空"
+        return True, random.choice(images).path
 
-    def remove_duplicates(self):
-        names = self._get_image_names()
-        unique_images = set()
-        for name in names:
-            path = os.path.join(self.path, name)
-            with open(path, "rb") as file:
-                data = file.read()
-                if data in unique_images:
-                    os.remove(path)
-                    logger.info(f"删除重复图片：{name}，图库：{self.name}")
-                else:
-                    unique_images.add(data)
 
-    def need_compress(self, image: bytes, max_size: int = 512) -> bool:
-        if not self.compress:
-            return False
-        with Image.open(io.BytesIO(image)) as img:
-            return img.format != "GIF" and (
-                img.width > max_size or img.height > max_size
-            )
-
-    @staticmethod
-    def compress_image(image_bytes: bytes, max_size: int = 512) -> bytes | None:
-        try:
-            with Image.open(io.BytesIO(image_bytes)) as image:
-                image.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
-                output = io.BytesIO()
-                image.save(output, format=image.format)
-                return output.getvalue()
-        except Exception as e:
-            logger.error(f"压缩图片失败：{e}")
-            return None
