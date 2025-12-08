@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 from astrbot.api.event import filter
 from astrbot.api.star import Context, Star, register
@@ -31,7 +32,7 @@ class GalleryPlugin(Star):
         self.conf = config
         self.plugin_data_dir = StarTools.get_data_dir("astrbot_plugin_gallery")
         self.db_path = str(self.plugin_data_dir / "gallery_info.json")
-        self.galleries_dir = os.path.abspath(config["galleries_dir"])
+        self.galleries_dir = Path(config["galleries_dir"]).resolve()
 
     async def initialize(self):
         """初始化"""

@@ -1,5 +1,6 @@
 import asyncio
 import os
+from pathlib import Path
 
 from astrbot import logger
 from astrbot.core.config.astrbot_config import AstrBotConfig
@@ -14,7 +15,8 @@ class GalleryManager:
     图库管理器类，负责管理所有图库的创建、删除和操作；
     内部维护一个图库列表
     """
-    def __init__(self, config: AstrBotConfig, db: GalleryDB, galleries_dir: str):
+
+    def __init__(self, config: AstrBotConfig, db: GalleryDB, galleries_dir: Path):
         """
         初始化图库管理器
         """
@@ -56,11 +58,10 @@ class GalleryManager:
         """
         从新的文件夹中加载图库
         """
-        for folder_name in os.listdir(self.galleries_dir):
-            folder_path = os.path.join(self.galleries_dir, folder_name)
-            if os.path.isdir(folder_path) and folder_name not in self.galleries:
+        for item in self.galleries_dir.iterdir():
+            if item.is_dir() and item.name not in self.galleries:
                 info = {
-                    "path": folder_path,
+                    "path": str(item.resolve()),
                     "creator_id": "new",
                     "creator_name": "new",
                     "capacity": self.capacity,
@@ -70,7 +71,7 @@ class GalleryManager:
 
     async def _load_from_zips(self):
         """从 ZIP 文件中加载图库"""
-        for folder_path in ZipUtils.extract_all_zips(self.galleries_dir):
+        for folder_path in ZipUtils.extract_all_zips(str(self.galleries_dir)):
             info = {
                 "path": folder_path,
                 "creator_id": "zip",
@@ -92,15 +93,15 @@ class GalleryManager:
         将指定图库压缩为ZIP文件
         :param name: 图库名称
         """
-        folder_path = os.path.join(self.galleries_dir, name)
-        if os.path.exists(folder_path):
-            zip_path = os.path.join(self.galleries_dir, f"{name}.zip")
+        folder_path = self.galleries_dir / name
+        if folder_path.is_dir():
+            zip_path = self.galleries_dir / f"{name}.zip"
             logger.info(f"正在将图库【{name}】压缩为ZIP文件")
             if not ZipUtils.zip_folder(str(folder_path), str(zip_path)):
                 logger.error(f"压缩文件夹失败: {folder_path}")
                 return None
             logger.info(f"图库【{name}】已成功压缩为ZIP文件：{zip_path}")
-            return zip_path
+            return str(zip_path)
         return None
 
     async def create_gallery(
@@ -119,7 +120,6 @@ class GalleryManager:
         self.galleries[gallery.name] = gallery
         await self._save_to_db()
         return gallery
-
 
     async def load_gallery(self, gallery_info: dict) -> Gallery:
         """
@@ -174,6 +174,7 @@ class GalleryManager:
             for gallery in self.galleries.values()
             if all(getattr(gallery, key) == value for key, value in filters.items())
         ]
+
     def get_gallery_by_tag(self, tag) -> list[Gallery]:
         """
         根据给定的匹配词获取图库实例列表
