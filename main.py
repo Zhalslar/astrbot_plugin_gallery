@@ -33,6 +33,7 @@ class GalleryPlugin(Star):
         self.plugin_data_dir = StarTools.get_data_dir("astrbot_plugin_gallery")
         self.db_path = str(self.plugin_data_dir / "gallery_info.json")
         self.galleries_dir = Path(config["galleries_dir"]).resolve()
+        self.galleries_dir.mkdir(parents=True, exist_ok=True)
 
     async def initialize(self):
         """初始化"""
@@ -137,7 +138,7 @@ class GalleryPlugin(Star):
         if not image:
             yield event.plain_result("未指定要解析的图片")
             return
-        info_str = await self.extractor.get_image_info(image) # type: ignore
+        info_str = await self.extractor.get_image_info(image)  # type: ignore
         if not info_str:
             yield event.plain_result("解析失败")
             return
