@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 from astrbot.api.event import filter
@@ -30,9 +29,18 @@ class GalleryPlugin(Star):
         super().__init__(context)
         self.context = context
         self.conf = config
+
+        # 1. 插件数据根目录（Path 对象）
         self.plugin_data_dir = StarTools.get_data_dir("astrbot_plugin_gallery")
-        self.db_path = str(self.plugin_data_dir / "gallery_info.json")
-        self.galleries_dir = Path(config["galleries_dir"]).resolve()
+
+        # 2. 数据库路径
+        self.db_path = self.plugin_data_dir / "gallery_info.json"
+
+        # 3. 图库目录：默认放在 <data_dir>/galleries
+        galleries_dir = (
+            config.get("galleries_dir") or self.plugin_data_dir / "galleries"
+        )
+        self.galleries_dir = Path(galleries_dir).resolve()
         self.galleries_dir.mkdir(parents=True, exist_ok=True)
 
     async def initialize(self):
