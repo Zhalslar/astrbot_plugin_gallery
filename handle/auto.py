@@ -162,38 +162,63 @@ class GalleryAuto:
 
     # --------------自动匹配、发图-------------------
 
+    async def _send_random_image(self, event: AstrMessageEvent, gallery) -> bool:
+        """从图库随机抽一张图片发送，返回是否成功"""
+        succ, image = gallery.get_random_image()
+        if succ:
+            await event.send(event.image_result(image))  # type: ignore
+        return succ
+
     async def match_user_msg(self, event: AstrMessageEvent):
         """给用户发送的消息匹配图片"""
         text = event.message_str
         if not text:
             return
         conf = self.conf["auto_match"]
-        if random.random() < conf["user_prob"]:
-            for gallery in self.manager.get_all_gallery():
+
+        # 优先：消息文本恰为某图库名/别称 → 直接随机发图（即 /图库名 触发）
+        # 仅在命中唤醒前缀（如 /）时生效，避免普通聊天误触发
+        if event.is_at_or_wake_command:
+            gallery = self.manager.get_gallery(text)
+            if gallery:
+                await self._send_random_image(event, gallery)
+                return
+
+        for gallery in self.manager.get_all_gallery():
+            # 精准匹配：命中匹配词即发图，不受概率/阈值限制
+            if gallery.match_mode == "precise":
+                if gallery.match(text):
+                    if await self._send_random_image(event, gallery):
+                        return
+                    continue
+            # 模糊匹配：BM25 相关度 + 概率 + 阈值
+            elif gallery.match_mode == "fuzzy" and random.random() < conf["user_prob"]:
                 score = self.matcher.calc(tags=gallery.tags, msg=text)
-                #print(f"{gallery.tags}: {score}")
                 if score > conf["user_threshold"]:
-                    succ, image = gallery.get_random_image()
-                    if succ:
-                        await event.send(event.image_result(image))  # type: ignore
-                    break
+                    if await self._send_random_image(event, gallery):
+                        return
 
     async def match_llm_msg(self, event: AstrMessageEvent, resp: LLMResponse):
         """给LLM响应的消息匹配图片"""
         conf = self.conf["auto_match"]
-        if random.random() < conf["llm_prob"]:
-            chain = resp.result_chain.chain if resp.result_chain else None
-            if not chain:
-                return
-            text = (
-                chain[0].text
-                if len(chain) == 1 and isinstance(chain[0], Comp.Plain)
-                else ""
-            )
-            for gallery in self.manager.get_all_gallery():
+        chain = resp.result_chain.chain if resp.result_chain else None
+        if not chain:
+            return
+        text = (
+            chain[0].text
+            if len(chain) == 1 and isinstance(chain[0], Comp.Plain)
+            else ""
+        )
+        for gallery in self.manager.get_all_gallery():
+            # 精准匹配：命中匹配词即发图，不受概率/阈值限制
+            if gallery.match_mode == "precise":
+                if gallery.match(text):
+                    if await self._send_random_image(event, gallery):
+                        return
+                    continue
+            # 模糊匹配：BM25 相关度 + 概率 + 阈值
+            elif gallery.match_mode == "fuzzy" and random.random() < conf["llm_prob"]:
                 score = self.matcher.calc(tags=gallery.tags, msg=text)
                 if score > conf["llm_threshold"]:
-                    succ, image = gallery.get_random_image()
-                    if succ:
-                        await event.send(event.image_result(image))  # type: ignore
-                break
+                    if await self._send_random_image(event, gallery):
+                        return

@@ -19,7 +19,8 @@ class GalleryShare:
     def __init__(self, config: AstrBotConfig, manager: GalleryManager):
         self.conf = config
         self.manager = manager
-        self.galleries_dir: str = os.path.abspath(config["galleries_dir"])
+        # 从 manager 获取已规范化的路径，确保一致性
+        self.galleries_dir: str = str(manager.galleries_dir)
 
     async def upload_gallery(self, event: AiocqhttpMessageEvent):
         """压缩并上传图库文件夹(仅aiocqhttp)"""

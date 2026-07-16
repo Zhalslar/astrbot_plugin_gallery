@@ -14,8 +14,14 @@
             "compress": {
                 "description": "自动压缩",
                 "type": "bool",
-                "hint": "开启后，往新图库存图时，若图片尺寸大于 512 x 512 则压缩图片，此尺寸的图片QQ会显示为表情包大小",
+                "hint": "开启后，往新图库存图时，若图片尺寸大于压缩尺寸则压缩图片",
                 "default": true
+            },
+            "compress_size": {
+                "description": "压缩尺寸",
+                "type": "int",
+                "hint": "图片压缩的目标尺寸（边长，单位：像素）。图片会按宽高比缩放到能放入此尺寸的正方形内。设置为512时QQ会显示为表情包大小，1024则为较大尺寸",
+                "default": 512
             },
             "capacity": {
                 "description": "图库的默认容量上限",
@@ -28,6 +34,24 @@
                 "type": "int",
                 "hint": "用户设定的图库名长度超过此长度会被截断(仅对公共图库生效)",
                 "default": 10
+            },
+            "match_mode": {
+                "description": "默认匹配模式",
+                "type": "string",
+                "hint": "新建图库的默认匹配模式：fuzzy=模糊匹配（基于标签的BM25相关度），precise=精准匹配（消息命中匹配词即发图）",
+                "default": "fuzzy"
+            },
+            "dedup_enabled": {
+                "description": "默认开启去重",
+                "type": "bool",
+                "hint": "开启后，往新图库存图时会检查是否已存在相同图片，避免重复",
+                "default": true
+            },
+            "add_image_timeout": {
+                "description": "存图等待超时（秒）",
+                "type": "int",
+                "hint": "执行 /存图 但未附带图片时，等待用户补发图片的超时时间（秒）。超时后自动结束本次存图",
+                "default": 60
             }
         }
     },
